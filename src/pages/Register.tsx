@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { db } from '../firebase';
+import { db } from '../utils/firebase';
 import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
 
 export default function Register() {

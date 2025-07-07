@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === Estilos Globales === */
+body {
+  @apply bg-gray-100 text-gray-900 font-sans m-0 p-0;
+}
+
+input, select, textarea {
+  @apply border border-neutral rounded-md px-3 py-2 w-full;
+}
+
+button {
+  @apply bg-primary text-white font-medium py-2 px-4 rounded-md hover:bg-yellow-500 transition;
+}
+
+label {
+  @apply block text-sm font-medium mb-1;
+}
+
+form {
+  @apply space-y-4;
+}
+
+h1, h2, h3 {
+  @apply font-semibold text-secondary;
+}
+
+.container-center {
+  @apply max-w-md mx-auto p-6 bg-white rounded-2xl shadow-md;
+}
+
+.error-text {
+  @apply text-red-500 text-sm mt-1;
+}
+
+.success-text {
+  @apply text-green-600 text-sm mt-1;
+}
+
+.link {
+  @apply text-blue-500 hover:underline;
+}
