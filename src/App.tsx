@@ -18,6 +18,7 @@ function App() {
         <Route path="/admin" element={<Admin />} />
         <Route path="/profile" element={<Profile />} />
       </Routes>
+   
     </AuthProvider>
   );
 }

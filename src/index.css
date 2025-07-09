@@ -2,43 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === Estilos Globales === */
-body {
-  @apply bg-gray-100 text-gray-900 font-sans m-0 p-0;
+
+
+/* --- Botones reutilizables --- */
+.btn-primary {
+  @apply w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-all duration-200;
 }
 
-input, select, textarea {
-  @apply border border-neutral rounded-md px-3 py-2 w-full;
+.btn-secondary {
+  @apply flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200;
 }
 
-button {
-  @apply bg-primary text-white font-medium py-2 px-4 rounded-md hover:bg-yellow-500 transition;
+.btn-submit {
+  @apply flex-1 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 disabled:opacity-50 transition-all duration-200;
 }
 
-label {
-  @apply block text-sm font-medium mb-1;
+/* --- Indicadores circulares --- */
+.status-circle-success {
+  @apply w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4;
 }
 
-form {
-  @apply space-y-4;
-}
-
-h1, h2, h3 {
-  @apply font-semibold text-secondary;
-}
-
-.container-center {
-  @apply max-w-md mx-auto p-6 bg-white rounded-2xl shadow-md;
-}
-
-.error-text {
-  @apply text-red-500 text-sm mt-1;
-}
-
-.success-text {
-  @apply text-green-600 text-sm mt-1;
-}
-
-.link {
-  @apply text-blue-500 hover:underline;
+.status-circle-error {
+  @apply w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4;
 }

@@ -1,5 +1,4 @@
-// <reference types="vite/client" />
-
+// src/vite-env.d.ts
 interface ImportMetaEnv {
   readonly VITE_API_KEY: string;
   readonly VITE_AUTH_DOMAIN: string;
@@ -13,3 +12,4 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+

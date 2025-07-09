@@ -32,9 +32,9 @@ export default function SessionsTable({ sessions, onExport, filters, setFilters 
           {sessions.map(s => (
             <tr key={s.id} className="border-t">
               <td className="px-2 py-1">{s.fullName}</td>
-              <td className="px-2 py-1">{formatDateTime(s.checkInTimestamp)}</td>
-              <td className="px-2 py-1">{s.checkOutTimestamp ? formatDateTime(s.checkOutTimestamp) : 'En curso'}</td>
-              <td className="px-2 py-1">{formatDuration(s.durationMinutes)}</td>
+                  <td className="px-2 py-1">{formatDateTime(s.checkInTimestamp.toDate())}</td>
+              <td className="px-2 py-1">{s.checkOutTimestamp ? formatDateTime(s.checkOutTimestamp.toDate()) : 'En curso'}</td>
+              <td className="px-2 py-1">{formatDuration(s.durationMinutes ?? 0)}</td>
             </tr>
           ))}
         </tbody>
