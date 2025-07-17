@@ -1,5 +1,7 @@
-import AdminInfo from "../components/Admin/AdminInfo";
+import AdminLayout from "../components/Admin/AdminLayout";
+
+
 
 export default function Admin() {
-  return <AdminInfo />;
+  return <AdminLayout />;
 }

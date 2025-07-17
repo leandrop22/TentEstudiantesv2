@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../../utils/firebase';
-import { collection, getDocs, addDoc, updateDoc, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, getDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
 import { 
@@ -60,6 +60,10 @@ interface Student {
   membresia: {
     medioPago: string;
     montoPagado: number;
+    nombre?: string;
+    estado?: string;
+    fechaDesde?: Timestamp; // Solo estos 2 campos como Timestamp
+    fechaHasta?: Timestamp;
   };
 }
 
@@ -134,7 +138,7 @@ const PaymentsTable: React.FC = () => {
         return {
           id: doc.id,
           fullName: data.fullName || '',
-          plan: data.plan || '', // Puede estar vacío al inicio
+          plan: data.plan || '',
           email: data.email || '',
           phone: data.phone || '',
           carrera: data.carrera || '',
@@ -150,14 +154,15 @@ const PaymentsTable: React.FC = () => {
           membresia: {
             medioPago: data.membresia?.medioPago || '',
             montoPagado: data.membresia?.montoPagado || 0,
+            nombre: data.membresia?.nombre || '',
+            estado: data.membresia?.estado || '',
+            fechaDesde: data.membresia?.fechaDesde || null,
+            fechaHasta: data.membresia?.fechaHasta || null,
           },
         };
       });
       setStudents(studentsData);
       console.log('✅ Estudiantes procesados:', studentsData.length);
-      studentsData.forEach(student => {
-        console.log(`  - ${student.fullName} (ID: ${student.id}) - Plan: "${student.plan || 'SIN PLAN'}"`);
-      });
     } catch (error: any) {
       console.error("❌ Error fetching students: ", error);
     }
@@ -209,7 +214,6 @@ const PaymentsTable: React.FC = () => {
     console.log('Nombre:', student.fullName);
     console.log('Plan actual:', student.plan || 'SIN PLAN');
     
-    // Si el estudiante no tiene plan asignado, usar el primer plan disponible o dejar vacío
     const currentPlan = student.plan || '';
     const studentPlan = plans.find(plan => plan.name === currentPlan);
     
@@ -260,6 +264,7 @@ const PaymentsTable: React.FC = () => {
         alert('Error: No se pudo identificar al estudiante. Intente seleccionarlo nuevamente.');
         return;
       }
+
       const paymentData = {
         fullName: newPayment.fullName,
         amount: newPayment.amount,
@@ -277,7 +282,7 @@ const PaymentsTable: React.FC = () => {
       const docRef = await addDoc(collection(db, 'payments'), paymentData);
       console.log('✅ Pago agregado con ID:', docRef.id);
       
-      // Actualizar el plan del estudiante
+      // Actualizar el plan del estudiante CON FECHAS DE VIGENCIA
       console.log('=== ACTUALIZANDO PLAN DEL ESTUDIANTE ===');
       console.log('ID del estudiante:', newPayment.studentId);
       console.log('Nuevo plan:', newPayment.plan);
@@ -285,13 +290,24 @@ const PaymentsTable: React.FC = () => {
       const studentRef = doc(db, 'students', newPayment.studentId);
       
       try {
-        // Actualizar tanto el campo 'plan' como la membresía
+        // Calcular fechas de vigencia usando Timestamp
+        const fechaPago = new Date(newPayment.date);
+        const fechaDesde = Timestamp.fromDate(fechaPago); // Fecha del pago como Timestamp
+        const fechaHasta = Timestamp.fromDate(new Date(fechaPago.getTime() + 30 * 24 * 60 * 60 * 1000)); // Un mes después como Timestamp
+        
+        console.log('Fechas calculadas:');
+        console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
+        console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
+        
+        // Actualizar el estudiante con las fechas de vigencia como Timestamp
         const updateData: any = {
           plan: newPayment.plan,
           'membresia.nombre': newPayment.plan,
           'membresia.estado': 'activa',
           'membresia.montoPagado': newPayment.amount,
           'membresia.medioPago': newPayment.method,
+          'membresia.fechaDesde': fechaDesde, // Timestamp directo
+          'membresia.fechaHasta': fechaHasta, // Timestamp directo
           activo: true
         };
         
@@ -370,7 +386,7 @@ const PaymentsTable: React.FC = () => {
       console.log('ID del pago:', editingPayment);
       console.log('Datos a actualizar:', editingData);
       
-      // Preparar datos para actualizar (solo los campos que existen en editingData)
+      // Preparar datos para actualizar
       const updateData: Partial<Payment> = {};
       if (editingData.fullName !== undefined) updateData.fullName = editingData.fullName;
       if (editingData.amount !== undefined) updateData.amount = editingData.amount;
@@ -385,48 +401,64 @@ const PaymentsTable: React.FC = () => {
       await updateDoc(doc(db, 'payments', editingPayment), updateData);
       console.log('✅ Pago actualizado en la base de datos');
       
-      // Si se cambió el plan del estudiante, actualizar también en la colección students
+      // Si se cambió el plan, fecha o monto del estudiante, actualizar también en la colección students
       const payment = payments.find(p => p.id === editingPayment);
       console.log('Pago original encontrado:', payment);
       
-      if (payment && payment.studentId && editingData.plan && editingData.plan !== payment.plan) {
-        console.log('=== ACTUALIZANDO PLAN DEL ESTUDIANTE ===');
-        console.log('Student ID:', payment.studentId);
-        console.log('Plan anterior:', payment.plan);
-        console.log('Plan nuevo:', editingData.plan);
+      if (payment && payment.studentId) {
+        const needsStudentUpdate = 
+          (editingData.plan && editingData.plan !== payment.plan) ||
+          (editingData.amount && editingData.amount !== payment.amount) ||
+          (editingData.method && editingData.method !== payment.method) ||
+          (editingData.date && editingData.date !== payment.date);
         
-        try {
-          // Actualizar tanto el campo 'plan' como la membresía
-          const studentUpdateData: any = {
-            plan: editingData.plan,
-            'membresia.nombre': editingData.plan,
-            'membresia.estado': 'activa',
-            activo: true
-          };
+        if (needsStudentUpdate) {
+          console.log('=== ACTUALIZANDO PLAN DEL ESTUDIANTE ===');
+          console.log('Student ID:', payment.studentId);
           
-          // Si también se cambió el monto, actualizarlo
-          if (editingData.amount !== undefined) {
-            studentUpdateData['membresia.montoPagado'] = editingData.amount;
+          try {
+            // Calcular nuevas fechas de vigencia usando Timestamp si cambió la fecha del pago
+            const fechaPago = new Date(editingData.date || payment.date);
+            const fechaDesde = Timestamp.fromDate(fechaPago);
+            const fechaHasta = Timestamp.fromDate(new Date(fechaPago.getTime() + 30 * 24 * 60 * 60 * 1000));
+            
+            console.log('Nuevas fechas calculadas:');
+            console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
+            console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
+            
+            // Actualizar el estudiante con las nuevas fechas de vigencia como Timestamp
+            const studentUpdateData: any = {
+              activo: true
+            };
+            
+            // Solo actualizar campos que cambiaron
+            if (editingData.plan !== undefined) {
+              studentUpdateData.plan = editingData.plan;
+              studentUpdateData['membresia.nombre'] = editingData.plan;
+              studentUpdateData['membresia.estado'] = 'activa';
+            }
+            
+            if (editingData.amount !== undefined) {
+              studentUpdateData['membresia.montoPagado'] = editingData.amount;
+            }
+            
+            if (editingData.method !== undefined) {
+              studentUpdateData['membresia.medioPago'] = editingData.method;
+            }
+            
+            if (editingData.date !== undefined) {
+              studentUpdateData['membresia.fechaDesde'] = fechaDesde; // Timestamp directo
+              studentUpdateData['membresia.fechaHasta'] = fechaHasta; // Timestamp directo
+            }
+            
+            console.log('Datos de actualización del estudiante:', studentUpdateData);
+            await updateDoc(doc(db, 'students', payment.studentId), studentUpdateData);
+            console.log('✅ Plan y membresía del estudiante actualizados exitosamente');
+          } catch (studentUpdateError: any) {
+            console.error('❌ Error al actualizar plan del estudiante:', studentUpdateError);
+            alert('El pago se actualizó pero no se pudo actualizar el plan del estudiante: ' + studentUpdateError.message);
           }
-          
-          // Si también se cambió el método de pago, actualizarlo
-          if (editingData.method !== undefined) {
-            studentUpdateData['membresia.medioPago'] = editingData.method;
-          }
-          
-          console.log('Datos de actualización del estudiante:', studentUpdateData);
-          await updateDoc(doc(db, 'students', payment.studentId), studentUpdateData);
-          console.log('✅ Plan y membresía del estudiante actualizados exitosamente');
-        } catch (studentUpdateError: any) {
-          console.error('❌ Error al actualizar plan del estudiante:', studentUpdateError);
-          alert('El pago se actualizó pero no se pudo actualizar el plan del estudiante: ' + studentUpdateError.message);
         }
-      } else {
-        console.log('⚠️ No se actualizó el plan del estudiante porque:');
-        console.log('  - Payment encontrado:', !!payment);
-        console.log('  - Student ID:', payment?.studentId || 'FALTANTE');
-        console.log('  - Plan nuevo:', editingData.plan || 'FALTANTE');
-        console.log('  - Plan cambió:', editingData.plan !== payment?.plan);
       }
       
       // Limpiar estado de edición
@@ -469,17 +501,12 @@ const PaymentsTable: React.FC = () => {
       console.log('=== ELIMINANDO PAGO ===');
       console.log('ID del pago a eliminar:', paymentId);
       
-      // Eliminar el pago de la base de datos
       await deleteDoc(doc(db, 'payments', paymentId));
       console.log('✅ Pago eliminado de la base de datos');
       
-      // Actualizar el estado local para reflejar la eliminación inmediatamente
       setPayments(prev => prev.filter(payment => payment.id !== paymentId));
-      
-      // Cerrar el modal de confirmación
       setShowDeleteConfirm(null);
       
-      // Refrescar datos para asegurar consistencia
       setTimeout(async () => {
         await fetchPayments();
         console.log('✅ Lista de pagos actualizada');
@@ -743,7 +770,7 @@ const PaymentsTable: React.FC = () => {
                           />
                         </div>
                       ) : (
-                        `$${payment.amount.toLocaleString()}`
+                        `${payment.amount.toLocaleString()}`
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -810,12 +837,22 @@ const PaymentsTable: React.FC = () => {
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => startEditing(payment)}
-                            className="text-tent-orange hover:text-tent-orange/80 transition-colors p-1 rounded"
-                          >
-                            <Edit2 size={16} />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => startEditing(payment)}
+                              className="text-tent-orange hover:text-tent-orange/80 transition-colors p-1 rounded"
+                              title="Editar pago"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => setShowDeleteConfirm(payment.id)}
+                              className="text-red-500 hover:text-red-600 transition-colors p-1 rounded"
+                              title="Eliminar pago"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -955,7 +992,9 @@ const PaymentsTable: React.FC = () => {
                     onChange={(e) => setNewPayment({ ...newPayment, date: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tent-orange focus:border-transparent"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Por defecto: fecha actual</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Esta fecha será el inicio de la vigencia del plan (1 mes desde esta fecha)
+                  </p>
                 </div>
 
                 {/* Facturado */}

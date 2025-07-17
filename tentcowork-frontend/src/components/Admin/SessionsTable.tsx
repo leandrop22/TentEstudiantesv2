@@ -183,7 +183,7 @@ const SessionsTable: React.FC = () => {
     >      {/* Header Principal */}
       <div className="bg-gradient-to-r from-[#F29F05] to-tent-orange rounded-t-xl shadow-lg p-6 text-white mb-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex   items-center space-x-4">
             <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
               <Activity className="h-8 w-8" />
             </div>

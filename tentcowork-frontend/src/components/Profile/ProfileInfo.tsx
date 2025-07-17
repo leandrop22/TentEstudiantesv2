@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { db, auth } from '../../utils/firebase';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,7 +26,7 @@ interface Estudiante {
   fullName: string;
   email: string;
   phone: string;
-  faculty: string;
+  university: string;
   carrera: string;
   accessCode: string;
   fotoURL?: string;
@@ -36,8 +36,8 @@ interface Estudiante {
     estado: 'activa' | 'pendiente' | 'cancelada' | 'vencido';
     montoPagado: number;
     medioPago: string;
-    fechaInicio?: string;
-    fechaVencimiento?: string;
+    fechaDesde?: Timestamp; // Solo estos 2 campos como Timestamp
+    fechaHasta?: Timestamp;
   };
 }
 
@@ -226,32 +226,47 @@ export default function ProfileInfo() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Funciones de validez de fecha
-  const verificarValidez = (fechaVencimiento: string) => {
+  // Función para verificar validez usando fechaDesde y fechaHasta como Timestamp
+  const verificarValidez = (fechaDesde?: Timestamp, fechaHasta?: Timestamp) => {
+    if (!fechaDesde || !fechaHasta) return false;
+    
     const hoy = new Date();
-    const vencimiento = new Date(fechaVencimiento);
-    return hoy <= vencimiento;
+    const desde = fechaDesde.toDate();
+    const hasta = fechaHasta.toDate();
+    
+    return hoy >= desde && hoy <= hasta;
   };
 
-  const getDiasRestantes = (fechaVencimiento: string) => {
+  // Función para obtener días restantes usando fechaHasta como Timestamp
+  const getDiasRestantes = (fechaHasta?: Timestamp) => {
+    if (!fechaHasta) return 0;
+    
     const hoy = new Date();
-    const vencimiento = new Date(fechaVencimiento);
-    const diferencia = vencimiento.getTime() - hoy.getTime();
+    const hasta = fechaHasta.toDate();
+    const diferencia = hasta.getTime() - hoy.getTime();
     return Math.ceil(diferencia / (1000 * 3600 * 24));
   };
 
+  // Función para obtener el estado real de la membresía
   const getEstadoReal = (membresia: any) => {
     if (!membresia) return 'sin_plan';
     
-    if (membresia.fechaVencimiento) {
-      const esValido = verificarValidez(membresia.fechaVencimiento);
-      if (!esValido) return 'vencido';
+    // Verificar si hay fechas de vigencia
+    if (membresia.fechaDesde && membresia.fechaHasta) {
+      const esValido = verificarValidez(membresia.fechaDesde, membresia.fechaHasta);
+      if (!esValido) {
+        const diasRestantes = getDiasRestantes(membresia.fechaHasta);
+        return diasRestantes < 0 ? 'vencido' : 'por_vencer';
+      }
       
-      const diasRestantes = getDiasRestantes(membresia.fechaVencimiento);
+      const diasRestantes = getDiasRestantes(membresia.fechaHasta);
       if (diasRestantes <= 7 && diasRestantes > 0) return 'por_vencer';
+      
+      return 'activa';
     }
     
-    return membresia.estado;
+    // Si no hay fechas de vigencia, usar el estado original
+    return membresia.estado || 'sin_plan';
   };
 
   const puedeContratarPlan = () => {
@@ -270,7 +285,23 @@ export default function ProfileInfo() {
         const q = query(collection(db, 'students'), where('email', '==', user.email));
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
-          const estudianteData = { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as Estudiante;
+          const estudianteData = { 
+            ...snapshot.docs[0].data(), 
+            id: snapshot.docs[0].id 
+          } as Estudiante;
+          
+          // Asegurar que membresia tenga la estructura correcta
+          if (estudianteData.membresia) {
+            // Convertir fechas string a Timestamp si es necesario
+            const membresia = estudianteData.membresia;
+            if (membresia.fechaDesde && typeof membresia.fechaDesde === 'string') {
+              membresia.fechaDesde = Timestamp.fromDate(new Date(membresia.fechaDesde));
+            }
+            if (membresia.fechaHasta && typeof membresia.fechaHasta === 'string') {
+              membresia.fechaHasta = Timestamp.fromDate(new Date(membresia.fechaHasta));
+            }
+          }
+          
           setEstudiante(estudianteData);
           console.log('Estudiante cargado:', estudianteData);
         }
@@ -351,18 +382,15 @@ export default function ProfileInfo() {
 
     setLoading(true);
     try {
-      const inicio = new Date();
-      const vencimiento = new Date();
-      vencimiento.setMonth(vencimiento.getMonth() + 1);
-
       const updateData = {
         plan: plan.name,
         'membresia.nombre': plan.name,
         'membresia.estado': 'pendiente',
         'membresia.montoPagado': 0,
         'membresia.medioPago': '',
-        'membresia.fechaInicio': inicio.toISOString(),
-        'membresia.fechaVencimiento': vencimiento.toISOString(),
+        // Solo se crean vacíos hasta que se haga el pago
+        'membresia.fechaDesde': null,
+        'membresia.fechaHasta': null,
       };
 
       await updateDoc(doc(db, 'students', estudiante.id), updateData);
@@ -375,8 +403,8 @@ export default function ProfileInfo() {
           estado: 'pendiente',
           montoPagado: 0,
           medioPago: '',
-          fechaInicio: inicio.toISOString(),
-          fechaVencimiento: vencimiento.toISOString(),
+          fechaDesde: undefined,
+          fechaHasta: undefined,
         }
       });
       
@@ -452,7 +480,7 @@ export default function ProfileInfo() {
 
   const planCompleto = getEstudiantePlan();
   const estadoReal = estudiante?.membresia ? getEstadoReal(estudiante.membresia) : 'sin_plan';
-  const diasRestantes = estudiante?.membresia?.fechaVencimiento ? getDiasRestantes(estudiante.membresia.fechaVencimiento) : 0;
+  const diasRestantes = estudiante?.membresia ? getDiasRestantes(estudiante.membresia.fechaHasta) : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
@@ -472,7 +500,7 @@ export default function ProfileInfo() {
                 className="object-cover w-full h-full"
               />
             </div>
-            <h1 className="text-3xl font-bold text-orange-600 mb-2">Mi Perfil</h1>
+            <h1 className="text-3xl font-bold text-tent-orange   mb-2">Mi Perfil</h1>
             <p className="text-gray-600">Información del estudiante</p>
           </div>
 
@@ -547,7 +575,7 @@ export default function ProfileInfo() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                       <div>
                         <span className="text-gray-600">Facultad:</span>
-                        <span className="font-medium ml-2">{estudiante.faculty}</span>
+                        <span className="font-medium ml-2">{estudiante.university}</span>
                       </div>
                       <div>
                         <span className="text-gray-600">Carrera:</span>
@@ -599,7 +627,7 @@ export default function ProfileInfo() {
                     }`}>
                       {estadoReal === 'vencido' 
                         ? '¡Tu plan ha vencido! Renovalo para seguir disfrutando del acceso.'
-                        : `¡Tu plan vence pronto! Renovalo antes de ${estudiante.membresia.fechaVencimiento ? new Date(estudiante.membresia.fechaVencimiento).toLocaleDateString() : 'la fecha de vencimiento'}.`
+                        : `¡Tu plan vence pronto! Renovalo antes de ${estudiante.membresia.fechaHasta ? estudiante.membresia.fechaHasta.toDate().toLocaleDateString() : 'la fecha de vencimiento'}.`
                       }
                     </span>
                   </div>
@@ -607,20 +635,23 @@ export default function ProfileInfo() {
               )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                {estudiante.membresia.fechaInicio && (
+                {/* Fechas de vigencia reales */}
+                {estudiante.membresia.fechaDesde && (
                   <div className="flex items-center space-x-2">
                     <Calendar size={16} />
-                    <span>Inicio: {new Date(estudiante.membresia.fechaInicio).toLocaleDateString()}</span>
+                    <span>Vigente desde: {estudiante.membresia.fechaDesde.toDate().toLocaleDateString()}</span>
                   </div>
                 )}
-                {estudiante.membresia.fechaVencimiento && (
+                {estudiante.membresia.fechaHasta && (
                   <div className="flex items-center space-x-2">
                     <Calendar size={16} />
                     <span className={diasRestantes <= 7 && diasRestantes > 0 ? 'font-semibold text-orange-700' : ''}>
-                      Válido hasta: {new Date(estudiante.membresia.fechaVencimiento).toLocaleDateString()}
+                      Vigente hasta: {estudiante.membresia.fechaHasta.toDate().toLocaleDateString()}
                     </span>
                   </div>
                 )}
+                
+                {/* Información adicional */}
                 <div className="flex items-center space-x-2">
                   <CreditCard size={16} />
                   <span>Plan: {estudiante.membresia.nombre}</span>
@@ -660,7 +691,10 @@ export default function ProfileInfo() {
                 <div className="flex items-center space-x-2 text-xs text-gray-600">
                   <Timer size={12} />
                   <span className="italic">
-                    Validez: 1 mes corrido desde la fecha de pago confirmado
+                    {estudiante.membresia.fechaDesde && estudiante.membresia.fechaHasta
+                      ? 'Vigencia: 1 mes desde la fecha de pago confirmado'
+                      : 'Vigencia: se activará con el pago confirmado'
+                    }
                   </span>
                 </div>
               </div>

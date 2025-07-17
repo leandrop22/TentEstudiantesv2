@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Plus, Edit2, Trash2, Clock, DollarSign, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { Calendar, Plus, Edit2, Trash2, Clock, DollarSign, ChevronDown, ChevronUp, Eye, EyeOff, AlertTriangle, X } from 'lucide-react';
 import { Plan } from '../../types/Plan';
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   onSubmit: () => void;
   onDelete: (id: string) => void;
   onEdit: (id: string, data: Plan) => void;
+  onCheckStudentsUsingPlan?: (planId: string) => Promise<number>; // Nueva prop para verificar estudiantes
 }
 
 const PlansEditor: React.FC<Props> = ({ 
@@ -20,10 +21,17 @@ const PlansEditor: React.FC<Props> = ({
   editingId, 
   onSubmit, 
   onDelete, 
-  onEdit 
+  onEdit,
+  onCheckStudentsUsingPlan
 }) => {
   const [expandedPlans, setExpandedPlans] = useState<Set<string>>(new Set());
   const [showForm, setShowForm] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    show: boolean;
+    planId: string;
+    planName: string;
+    studentsCount: number;
+  }>({ show: false, planId: '', planName: '', studentsCount: 0 });
 
   const togglePlanExpansion = (planId: string) => {
     const newExpanded = new Set(expandedPlans);
@@ -33,6 +41,41 @@ const PlansEditor: React.FC<Props> = ({
       newExpanded.add(planId);
     }
     setExpandedPlans(newExpanded);
+  };
+
+  const handleEdit = (id: string, data: Plan) => {
+    onEdit(id, data);
+    setShowForm(true); // Abrir automáticamente el formulario
+  };
+
+  const handleDeleteClick = async (planId: string, planName: string) => {
+    let studentsCount = 0;
+    
+    if (onCheckStudentsUsingPlan) {
+      try {
+        studentsCount = await onCheckStudentsUsingPlan(planId);
+      } catch (error) {
+        console.error('Error verificando estudiantes:', error);
+      }
+    }
+
+    setDeleteConfirmation({
+      show: true,
+      planId,
+      planName,
+      studentsCount
+    });
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmation.studentsCount === 0) {
+      onDelete(deleteConfirmation.planId);
+    }
+    setDeleteConfirmation({ show: false, planId: '', planName: '', studentsCount: 0 });
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmation({ show: false, planId: '', planName: '', studentsCount: 0 });
   };
 
   const formatDays = (days: string) => {
@@ -256,16 +299,18 @@ const PlansEditor: React.FC<Props> = ({
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => onEdit(plan.id, plan)}
+                          onClick={() => handleEdit(plan.id, plan)}
                           className="text-tent-orange hover:text-tent-orange p-2 rounded-lg hover:bg-orange-50 transition-colors"
+                          title="Editar plan"
                         >
                           <Edit2 size={16} />
                         </motion.button>
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => onDelete(plan.id)}
+                          onClick={() => handleDeleteClick(plan.id, plan.name)}
                           className="text-red-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Eliminar plan"
                         >
                           <Trash2 size={16} />
                         </motion.button>
@@ -315,6 +360,90 @@ const PlansEditor: React.FC<Props> = ({
           </div>
         )}
       </div>
+
+      {/* Modal de Confirmación de Borrado */}
+      <AnimatePresence>
+        {deleteConfirmation.show && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full mx-4"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    deleteConfirmation.studentsCount > 0 ? 'bg-red-100' : 'bg-orange-100'
+                  }`}>
+                    {deleteConfirmation.studentsCount > 0 ? (
+                      <X className="text-red-600" size={24} />
+                    ) : (
+                      <AlertTriangle className="text-orange-600" size={24} />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {deleteConfirmation.studentsCount > 0 ? 'No se puede eliminar' : 'Confirmar eliminación'}
+                    </h3>
+                    <p className="text-sm text-gray-500">Plan: {deleteConfirmation.planName}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                {deleteConfirmation.studentsCount > 0 ? (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-red-800 text-sm">
+                      <strong>No se puede eliminar este plan.</strong>
+                    </p>
+                    <p className="text-red-700 text-sm mt-2">
+                      Hay <strong>{deleteConfirmation.studentsCount} estudiante{deleteConfirmation.studentsCount !== 1 ? 's' : ''}</strong> {' '}
+                      asignado{deleteConfirmation.studentsCount !== 1 ? 's' : ''} a este plan. 
+                      Primero debes reasignar o eliminar estos estudiantes.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <p className="text-orange-800 text-sm">
+                      ¿Estás seguro de que quieres eliminar el plan <strong>"{deleteConfirmation.planName}"</strong>?
+                    </p>
+                    <p className="text-orange-700 text-sm mt-2">
+                      Esta acción no se puede deshacer.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={cancelDelete}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                >
+                  {deleteConfirmation.studentsCount > 0 ? 'Entendido' : 'Cancelar'}
+                </motion.button>
+                {deleteConfirmation.studentsCount === 0 && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={confirmDelete}
+                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Eliminar Plan
+                  </motion.button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
