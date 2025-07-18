@@ -22,6 +22,7 @@ import {
   Trash2,
   AlertTriangle
 } from 'lucide-react';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface Plan {
   id: string;
@@ -67,6 +68,14 @@ interface Student {
   };
 }
 
+const SUPER_ADMINS = [
+  'leandropetricca123@gmail.com',  // Tu email
+  // Agregar más emails de super-admins si necesariox 
+];
+const currentUserEmail = 'leandropetricca123@gmail.com'; // 🔑 Tu email real
+const isSuperAdmin = SUPER_ADMINS.includes(currentUserEmail);
+
+
 const PaymentsTable: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -78,6 +87,7 @@ const PaymentsTable: React.FC = () => {
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false); 
   
   const [filters, setFilters] = useState({
     name: '',
@@ -98,7 +108,7 @@ const PaymentsTable: React.FC = () => {
     studentId: '',
   });
 
-  const paymentMethods = ['Efectivo', 'Mercado Pago', 'Transferencia', 'Tarjeta'];
+  const paymentMethods = ['Efectivo', 'Mercado Pago Transferencia', 'Mercado Pago Posnet','Mercado Pago Hospedado'];
 
   useEffect(() => {
     fetchPayments();
@@ -242,124 +252,134 @@ const PaymentsTable: React.FC = () => {
   };
 
   const handleAddPayment = async () => {
-    try {
-      // Validaciones antes de proceder
-      if (!newPayment.fullName) {
-        alert('Debe seleccionar un estudiante');
-        return;
-      }
-      if (!newPayment.plan) {
-        alert('Debe seleccionar un plan');
-        return;
-      }
-      if (!newPayment.method) {
-        alert('Debe seleccionar un método de pago');
-        return;
-      }
-      if (newPayment.amount <= 0) {
-        alert('El monto debe ser mayor a 0');
-        return;
-      }
-      if (!newPayment.studentId) {
-        alert('Error: No se pudo identificar al estudiante. Intente seleccionarlo nuevamente.');
-        return;
-      }
+  // 🚫 PREVENIR DOBLE ENVÍO
+  if (isSubmitting) {
+    console.log('Ya se está procesando un pago...');
+    return;
+  }
 
-      const paymentData = {
-        fullName: newPayment.fullName,
-        amount: newPayment.amount,
-        method: newPayment.method,
-        date: newPayment.date || new Date().toISOString().split('T')[0],
-        facturado: newPayment.facturado,
-        plan: newPayment.plan,
-        studentId: newPayment.studentId,
-      };
+  try {
+    setIsSubmitting(true); // 🔒 Bloquear más envíos
 
-      console.log('=== AGREGANDO PAGO ===');
-      console.log('Datos del pago:', paymentData);
-
-      // Agregar el pago
-      const docRef = await addDoc(collection(db, 'payments'), paymentData);
-      console.log('✅ Pago agregado con ID:', docRef.id);
-      
-      // Actualizar el plan del estudiante CON FECHAS DE VIGENCIA
-      console.log('=== ACTUALIZANDO PLAN DEL ESTUDIANTE ===');
-      console.log('ID del estudiante:', newPayment.studentId);
-      console.log('Nuevo plan:', newPayment.plan);
-      
-      const studentRef = doc(db, 'students', newPayment.studentId);
-      
-      try {
-        // Calcular fechas de vigencia usando Timestamp
-        const fechaPago = new Date(newPayment.date);
-        const fechaDesde = Timestamp.fromDate(fechaPago); // Fecha del pago como Timestamp
-        const fechaHasta = Timestamp.fromDate(new Date(fechaPago.getTime() + 30 * 24 * 60 * 60 * 1000)); // Un mes después como Timestamp
-        
-        console.log('Fechas calculadas:');
-        console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
-        console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
-        
-        // Actualizar el estudiante con las fechas de vigencia como Timestamp
-        const updateData: any = {
-          plan: newPayment.plan,
-          'membresia.nombre': newPayment.plan,
-          'membresia.estado': 'activa',
-          'membresia.montoPagado': newPayment.amount,
-          'membresia.medioPago': newPayment.method,
-          'membresia.fechaDesde': fechaDesde, // Timestamp directo
-          'membresia.fechaHasta': fechaHasta, // Timestamp directo
-          activo: true
-        };
-        
-        console.log('Datos de actualización del estudiante:', updateData);
-        await updateDoc(studentRef, updateData);
-        console.log('✅ Plan y membresía del estudiante actualizados exitosamente');
-        
-        // Verificar que se actualizó correctamente
-        const updatedStudent = await getDoc(studentRef);
-        if (updatedStudent.exists()) {
-          const data = updatedStudent.data();
-          console.log('✅ Verificación - Datos actualizados en Firebase:');
-          console.log('  - Plan:', data.plan);
-          console.log('  - Membresía:', data.membresia);
-          console.log('  - Activo:', data.activo);
-        }
-        
-      } catch (updateError: any) {
-        console.error('❌ Error al actualizar el estudiante:', updateError);
-        console.error('Código de error:', updateError.code);
-        console.error('Mensaje:', updateError.message);
-        alert('El pago se agregó pero no se pudo actualizar el plan del estudiante. Error: ' + updateError.message);
-      }
-      
-      // Reset form
-      setNewPayment({
-        fullName: '',
-        amount: 0,
-        method: '',
-        date: new Date().toISOString().split('T')[0],
-        facturado: false,
-        plan: '',
-        studentId: '',
-      });
-      setIsModalOpen(false);
-      
-      // Refrescar datos con un pequeño delay para asegurar que Firebase se actualizó
-      console.log('🔄 Refrescando datos en 2 segundos...');
-      setTimeout(async () => {
-        await fetchPayments();
-        await fetchStudents();
-        console.log('✅ Datos refrescados');
-      }, 2000);
-      
-      alert('✅ Pago agregado exitosamente');
-    } catch (error: any) {
-      console.error('❌ Error completo al agregar pago:', error);
-      console.error('Código de error:', error.code);
-      console.error('Mensaje:', error.message);
-      alert('Error al agregar el pago: ' + error.message);
+    // Validaciones antes de proceder
+    if (!newPayment.fullName) {
+      alert('Debe seleccionar un estudiante');
+      return;
     }
-  };
+    if (!newPayment.plan) {
+      alert('Debe seleccionar un plan');
+      return;
+    }
+    if (!newPayment.method) {
+      alert('Debe seleccionar un método de pago');
+      return;
+    }
+    if (newPayment.amount <= 0) {
+      alert('El monto debe ser mayor a 0');
+      return;
+    }
+    if (!newPayment.studentId) {
+      alert('Error: No se pudo identificar al estudiante. Intente seleccionarlo nuevamente.');
+      return;
+    }
+
+    const paymentData = {
+      fullName: newPayment.fullName,
+      amount: newPayment.amount,
+      method: newPayment.method,
+      date: newPayment.date || new Date().toISOString().split('T')[0],
+      facturado: newPayment.facturado,
+      plan: newPayment.plan,
+      studentId: newPayment.studentId,
+    };
+
+    console.log('=== AGREGANDO PAGO ===');
+    console.log('Datos del pago:', paymentData);
+
+    // Agregar el pago
+    const docRef = await addDoc(collection(db, 'payments'), paymentData);
+    console.log('✅ Pago agregado con ID:', docRef.id);
+    
+    // Actualizar el plan del estudiante CON FECHAS DE VIGENCIA
+    console.log('=== ACTUALIZANDO PLAN DEL ESTUDIANTE ===');
+    console.log('ID del estudiante:', newPayment.studentId);
+    console.log('Nuevo plan:', newPayment.plan);
+    
+    const studentRef = doc(db, 'students', newPayment.studentId);
+    
+    try {
+      // Calcular fechas de vigencia usando Timestamp
+      const fechaPago = new Date(newPayment.date);
+      const fechaDesde = Timestamp.fromDate(fechaPago); // Fecha del pago como Timestamp
+      const fechaHasta = Timestamp.fromDate(new Date(fechaPago.getTime() + 30 * 24 * 60 * 60 * 1000)); // Un mes después como Timestamp
+      
+      console.log('Fechas calculadas:');
+      console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
+      console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
+      
+      // Actualizar el estudiante con las fechas de vigencia como Timestamp
+      const updateData: any = {
+        plan: newPayment.plan,
+        'membresia.nombre': newPayment.plan,
+        'membresia.estado': 'activa',
+        'membresia.montoPagado': newPayment.amount,
+        'membresia.medioPago': newPayment.method,
+        'membresia.fechaDesde': fechaDesde, // Timestamp directo
+        'membresia.fechaHasta': fechaHasta, // Timestamp directo
+        activo: true
+      };
+      
+      console.log('Datos de actualización del estudiante:', updateData);
+      await updateDoc(studentRef, updateData);
+      console.log('✅ Plan y membresía del estudiante actualizados exitosamente');
+      
+      // Verificar que se actualizó correctamente
+      const updatedStudent = await getDoc(studentRef);
+      if (updatedStudent.exists()) {
+        const data = updatedStudent.data();
+        console.log('✅ Verificación - Datos actualizados en Firebase:');
+        console.log('  - Plan:', data.plan);
+        console.log('  - Membresía:', data.membresia);
+        console.log('  - Activo:', data.activo);
+      }
+      
+    } catch (updateError: any) {
+      console.error('❌ Error al actualizar el estudiante:', updateError);
+      console.error('Código de error:', updateError.code);
+      console.error('Mensaje:', updateError.message);
+      alert('El pago se agregó pero no se pudo actualizar el plan del estudiante. Error: ' + updateError.message);
+    }
+    
+    // Reset form
+    setNewPayment({
+      fullName: '',
+      amount: 0,
+      method: '',
+      date: new Date().toISOString().split('T')[0],
+      facturado: false,
+      plan: '',
+      studentId: '',
+    });
+    setIsModalOpen(false);
+    
+    // Refrescar datos con un pequeño delay para asegurar que Firebase se actualizó
+    console.log('🔄 Refrescando datos en 2 segundos...');
+    setTimeout(async () => {
+      await fetchPayments();
+      await fetchStudents();
+      console.log('✅ Datos refrescados');
+    }, 2000);
+    
+    alert('✅ Pago agregado exitosamente');
+  } catch (error: any) {
+    console.error('❌ Error completo al agregar pago:', error);
+    console.error('Código de error:', error.code);
+    console.error('Mensaje:', error.message);
+    alert('Error al agregar el pago: ' + error.message);
+  } finally {
+    setIsSubmitting(false); // 🔓 Desbloquear para futuros envíos (SIEMPRE se ejecuta)
+  }
+};
 
   const startEditing = (payment: Payment) => {
     setEditingPayment(payment.id);
@@ -845,13 +865,15 @@ const PaymentsTable: React.FC = () => {
                             >
                               <Edit2 size={16} />
                             </button>
+                             {isSuperAdmin && (
                             <button
                               onClick={() => setShowDeleteConfirm(payment.id)}
                               className="text-red-500 hover:text-red-600 transition-colors p-1 rounded"
-                              title="Eliminar pago"
+                              title="Eliminar pago (Solo Super-Admin)"
                             >
                               <Trash2 size={16} />
                             </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -1032,10 +1054,17 @@ const PaymentsTable: React.FC = () => {
                   </button>
                   <button
                     onClick={handleAddPayment}
-                    disabled={!newPayment.fullName || !newPayment.plan || !newPayment.method || newPayment.amount <= 0}
-                    className="flex-1 px-4 py-2 bg-tent-orange text-white rounded-lg hover:bg-tent-orange/90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    disabled={!newPayment.fullName || !newPayment.plan || !newPayment.method || newPayment.amount <= 0 || isSubmitting}
+                    className="flex-1 px-4 py-2 bg-tent-orange text-white rounded-lg hover:bg-tent-orange/90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                   >
-                    Agregar Pago
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Procesando...</span>
+                      </>
+                    ) : (
+                      <span>Agregar Pago</span>
+                    )}
                   </button>
                 </div>
               </div>

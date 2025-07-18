@@ -1,15 +1,19 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  User, Mail, Phone, GraduationCap, CreditCard, Calendar,
-  CheckCircle, XCircle, AlertCircle, LogOut, Shield, Star, Edit3,
-  Clock, ChevronDown, ChevronUp, AlertTriangle, Timer
+  User, LogOut, Edit3, CheckCircle, XCircle, Camera, Sparkles, Crown, Heart
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { db, auth } from '../../utils/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, Timestamp, addDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+
+// Importar los subcomponentes
+import EditProfile from './EditProfile';
+import MembresiaProfile from './MembresiaProfile';
+import PlansProfile from './PlansProfile';
+import PaymentProfile from './PaymentProfile';
 
 interface Plan {
   id: string;
@@ -36,185 +40,10 @@ interface Estudiante {
     estado: 'activa' | 'pendiente' | 'cancelada' | 'vencido';
     montoPagado: number;
     medioPago: string;
-    fechaDesde?: Timestamp; // Solo estos 2 campos como Timestamp
+    fechaDesde?: Timestamp;
     fechaHasta?: Timestamp;
   };
 }
-
-// Componente PlanCard
-interface PlanCardProps {
-  plan: Plan;
-  onComprar: () => void;
-  loading: boolean;
-  isDisabled: boolean;
-}
-
-const PlanCard: React.FC<PlanCardProps> = ({ plan, onComprar, loading, isDisabled }) => {
-  const [expanded, setExpanded] = useState(false);
-
-  const formatearDescripcion = (descripcion: string) => {
-    if (!descripcion) return null;
-
-    const lineas = descripcion.split('\n').filter(linea => linea.trim() !== '');
-    
-    return (
-      <div className="text-sm text-gray-700 leading-relaxed">
-        {lineas.map((linea, index) => {
-          const lineaTrim = linea.trim();
-          
-          if (lineaTrim.includes('$') && lineaTrim.includes('/')) {
-            return (
-              <div key={index} className="font-semibold text-gray-900 mb-2">
-                {lineaTrim}
-              </div>
-            );
-          }
-          
-          if (lineaTrim.startsWith('- Horario')) {
-            return (
-              <div key={index} className="flex items-start space-x-2 mb-1">
-                <Clock size={14} className="text-tent-orange mt-0.5 flex-shrink-0" />
-                <span>{lineaTrim.substring(2)}</span>
-              </div>
-            );
-          }
-          
-          if (lineaTrim.startsWith('- ')) {
-            return (
-              <div key={index} className="flex items-start space-x-2 mb-1">
-                <div className="w-1 h-1 bg-tent-orange rounded-full mt-2 flex-shrink-0"></div>
-                <span>{lineaTrim.substring(2)}</span>
-              </div>
-            );
-          }
-          
-          if (lineaTrim.startsWith('*')) {
-            return (
-              <div key={index} className="text-xs text-orange-600 italic mt-2 mb-1 bg-orange-50 p-2 rounded border-l-2 border-orange-300">
-                {lineaTrim}
-              </div>
-            );
-          }
-          
-          if (lineaTrim.endsWith(':')) {
-            return (
-              <div key={index} className="font-medium text-gray-900 mt-3 mb-2">
-                {lineaTrim}
-              </div>
-            );
-          }
-          
-          return (
-            <div key={index} className="mb-1">
-              {lineaTrim}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  return (
-    <motion.div
-      whileHover={{ scale: 1.01 }}
-      className="border-2 border-gray-200 rounded-xl overflow-hidden hover:border-tent-orange transition-all duration-200 bg-gradient-to-br from-white to-gray-50"
-    >
-      <div className="p-6 border-b border-gray-200 bg-white">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-orange-600">
-              ${plan.price.toLocaleString()}
-            </div>
-            <div className="text-xs text-gray-500 uppercase tracking-wide">
-                
-            </div>
-          </div>
-        </div>
-        
-        {plan.startHour && plan.endHour && (
-          <div className="flex items-center space-x-2 text-gray-600">
-            <Clock size={16} className="text-tent-orange" />
-            <span className="text-sm font-medium">
-              {plan.startHour} - {plan.endHour}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="p-6">
-        {plan.description && (
-          <div className="mb-4">
-            <div className={`${expanded ? 'hidden' : 'block'}`}>
-              <p className="text-gray-700 text-sm leading-relaxed">
-                {plan.description.split('\n')[0]?.trim() || plan.description.substring(0, 120) + '...'}
-              </p>
-            </div>
-            
-            <AnimatePresence>
-              {expanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  {formatearDescripcion(plan.description)}
-                </motion.div>
-              )}
-            </AnimatePresence>
-            
-            {plan.description.length > 120 && (
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="flex items-center space-x-1 text-tent-orange hover:text-orange-600 text-sm font-medium mt-3 transition-colors"
-              >
-                <span>{expanded ? 'Ver menos' : 'Ver más'}</span>
-                {expanded ? (
-                  <ChevronUp size={16} />
-                ) : (
-                  <ChevronDown size={16} />
-                )}
-              </button>
-            )}
-          </div>
-        )}
-
-        {plan.days && (
-          <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
-            <div className="flex items-center space-x-2">
-              <Calendar size={14} className="text-tent-orange" />
-              <span className="text-sm font-medium text-gray-900">Días disponibles:</span>
-            </div>
-            <p className="text-sm text-gray-700 mt-1">{plan.days}</p>
-          </div>
-        )}
-
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={onComprar}
-          disabled={loading || isDisabled}
-          className="w-full py-3 bg-gradient-to-r from-tent-orange to-orange-600 text-white rounded-lg font-medium hover:from-orange-600 hover:to-orange-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-        >
-          {loading ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>Procesando...</span>
-            </>
-          ) : isDisabled ? (
-            <span>Ya tienes un plan activo</span>
-          ) : (
-            <>
-              <CreditCard size={18} />
-              <span>Contratar Plan</span>
-            </>
-          )}
-        </motion.button>
-      </div>
-    </motion.div>
-  );
-};
 
 export default function ProfileInfo() {
   const { user } = useAuth();
@@ -224,6 +53,9 @@ export default function ProfileInfo() {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Función para verificar validez usando fechaDesde y fechaHasta como Timestamp
@@ -422,95 +254,151 @@ export default function ProfileInfo() {
     navigate('/login');
   };
 
-  const getEstadoColor = (estadoReal: string) => {
-    switch (estadoReal) {
-      case 'activa': return 'bg-green-100 text-green-700 border-green-200';
-      case 'pendiente': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'por_vencer': return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'vencido': return 'bg-red-100 text-red-700 border-red-200';
-      case 'cancelada': return 'bg-gray-100 text-gray-700 border-gray-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+  const handleUpdateEstudiante = (updatedEstudiante: Estudiante) => {
+    setEstudiante(updatedEstudiante);
+  };
+
+  const handleSeleccionarMetodoPago = (plan: Plan) => {
+    if (!puedeContratarPlan()) {
+      setMensaje('Ya tenés un plan activo vigente.');
+      return;
+    }
+    setSelectedPlan(plan);
+    setShowPaymentModal(true);
+  };
+
+  const handlePayWithMercadoPago = async (plan: Plan) => {
+    setPaymentLoading(true);
+    try {
+      if (!estudiante) {
+        setMensaje('Error: No se encontró información del estudiante');
+        return;
+      }
+
+      // Usar EXACTAMENTE la misma estructura que PaymentsTable
+      const paymentData = {
+        fullName: estudiante.fullName,
+        amount: plan.price,
+        method: 'Mercado Pago Hospedado', // Usar el mismo método que en PaymentsTable
+        date: new Date().toISOString().split('T')[0],
+        facturado: false, // Inicialmente false, se actualiza cuando se confirme el pago
+        plan: plan.name,
+        studentId: estudiante.id,
+        // Campos adicionales para Mercado Pago
+        status: 'pending',
+        mercadoPagoId: '', // Se llenará después
+      };
+
+      console.log('=== CREANDO PAGO MERCADO PAGO ===');
+      console.log('Datos del pago:', paymentData);
+
+      // 1. Crear el registro de pago en la colección 'payments' (igual que PaymentsTable)
+      const docRef = await addDoc(collection(db, 'payments'), paymentData);
+      console.log('✅ Pago creado con ID:', docRef.id);
+
+      // 2. Aquí iría la lógica para crear la preferencia en Mercado Pago
+      // Por ahora simulamos la creación de la preferencia
+      const mockMercadoPagoResponse = {
+        id: 'MP_' + Date.now(),
+        init_point: `https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=MP_${Date.now()}`,
+        status: 'pending'
+      };
+
+      // 3. Actualizar el pago con el ID de Mercado Pago
+      await updateDoc(doc(db, 'payments', docRef.id), {
+        mercadoPagoId: mockMercadoPagoResponse.id,
+        status: 'pending'
+      });
+
+      // 4. Actualizar el estudiante con estado 'pendiente' (igual que efectivo pero sin activar aún)
+      const studentRef = doc(db, 'students', estudiante.id);
+      const updateData = {
+        plan: plan.name,
+        'membresia.nombre': plan.name,
+        'membresia.estado': 'pendiente', // Pendiente hasta que se confirme el pago
+        'membresia.montoPagado': 0, // Aún no pagado
+        'membresia.medioPago': 'Mercado Pago Hospedado',
+        'membresia.fechaDesde': null, // Se establecerá cuando se confirme el pago
+        'membresia.fechaHasta': null,
+        // NO establecemos activo: true hasta confirmar el pago
+      };
+
+      await updateDoc(studentRef, updateData);
+      console.log('✅ Estudiante actualizado con estado pendiente');
+
+      setMensaje('¡Redirigiendo a Mercado Pago! Tu plan se activará automáticamente cuando confirmes el pago.');
+      setShowPaymentModal(false);
+      
+      // Simular redirección a Mercado Pago
+      console.log('🔗 URL de pago:', mockMercadoPagoResponse.init_point);
+      // window.open(mockMercadoPagoResponse.init_point, '_self');
+      
+      // Por ahora solo mostramos un alert con la URL simulada
+      alert(`Redirigiendo a Mercado Pago...\nURL: ${mockMercadoPagoResponse.init_point}`);
+      
+    } catch (error) {
+      console.error('❌ Error procesando pago con Mercado Pago:', error);
+      setMensaje('Error al procesar el pago. Intenta nuevamente.');
+    } finally {
+      setPaymentLoading(false);
     }
   };
 
-  const getEstadoIcon = (estadoReal: string) => {
-    switch (estadoReal) {
-      case 'activa': return <CheckCircle size={20} className="text-green-600" />;
-      case 'pendiente': return <AlertCircle size={20} className="text-yellow-600" />;
-      case 'por_vencer': return <Timer size={20} className="text-orange-600" />;
-      case 'vencido': return <XCircle size={20} className="text-red-600" />;
-      case 'cancelada': return <XCircle size={20} className="text-gray-600" />;
-      default: return <AlertCircle size={20} className="text-gray-600" />;
+  const handlePayWithCash = async (plan: Plan) => {
+    setPaymentLoading(true);
+    try {
+      // Usar la lógica existente de comprarPlan que ya es consistente con PaymentsTable
+      await comprarPlan(plan);
+      setShowPaymentModal(false);
+    } catch (error) {
+      console.error('Error procesando pago en efectivo:', error);
+      setMensaje('Error al procesar la solicitud. Intenta nuevamente.');
+    } finally {
+      setPaymentLoading(false);
     }
-  };
-
-  const getEstadoTexto = (estadoReal: string, diasRestantes?: number) => {
-    switch (estadoReal) {
-      case 'activa': return 'Activa';
-      case 'pendiente': return 'Pendiente de pago';
-      case 'por_vencer': return `Expira en ${diasRestantes} días`;
-      case 'vencido': return 'Plan vencido';
-      case 'cancelada': return 'Cancelada';
-      default: return 'Estado desconocido';
-    }
-  };
-
-  const getEstudiantePlan = () => {
-    if (!estudiante || !estudiante.plan) return null;
-    return planes.find(plan => plan.name === estudiante.plan);
-  };
-
-  const formatearHorario = (planCompleto: Plan | null) => {
-    if (!planCompleto || !planCompleto.startHour || !planCompleto.endHour) {
-      return 'Horario no especificado';
-    }
-    return `${planCompleto.startHour} - ${planCompleto.endHour}`;
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
-        <div className="flex flex-col items-center">
-          <div className="w-16 h-16 border-4 border-tent-orange border-dashed rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600 text-lg font-medium">Cargando perfil...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="flex flex-col items-center space-y-6"
+        >
+          <div className="relative">
+            <div className="w-20 h-20 border-4 border-purple-200 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 w-20 h-20 border-4 border-tent-orange border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Cargando tu perfil...</h2>
+          
+          </div>
+        </motion.div>
       </div>
     );
   }
 
-  const planCompleto = getEstudiantePlan();
-  const estadoReal = estudiante?.membresia ? getEstadoReal(estudiante.membresia) : 'sin_plan';
-  const diasRestantes = estudiante?.membresia ? getDiasRestantes(estudiante.membresia.fechaHasta) : 0;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-4">
+      <div className="max-w-4xl mx-auto space-y-8">
         
-        {/* Header */}
+        {/* Header Principal del Perfil */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-2xl p-8"
+          className="bg-white rounded-3xl shadow-2xl overflow-hidden"
         >
-          <div className="text-center mb-6">
-            <div className="w-28 h-28 rounded-full overflow-hidden bg-white shadow-lg mx-auto mb-6">
-              <img
-                src="/logorecortadoo.jpg"
-                alt="Logo Tent"
-                className="object-cover w-full h-full"
-              />
-            </div>
-            <h1 className="text-3xl font-bold text-tent-orange   mb-2">Mi Perfil</h1>
-            <p className="text-gray-600">Información del estudiante</p>
-          </div>
-
-          {estudiante && (
-            <div className="space-y-6">
-              <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
+          {/* Banner superior con gradiente */}
+          <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 h-32 relative">
+            <div className="absolute inset-0 bg-black bg-opacity-20"></div>
+            <div className="absolute bottom-0 left-0 right-0 p-6">
+              <div className="flex items-end space-x-4">
+                {/* Foto de perfil */}
                 <div className="relative">
-                  <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 border-4 border-tent-orange">
+                  <div className="w-24 h-24 rounded-full overflow-hidden bg-white border-4 border-white shadow-xl">
                     <img
-                      src={estudiante.fotoURL || 'https://via.placeholder.com/80'}
+                      src={estudiante?.fotoURL || '/logorecortadoo.jpg'}
                       alt="Foto de perfil"
                       className="w-full h-full object-cover"
                     />
@@ -521,12 +409,12 @@ export default function ProfileInfo() {
                     whileTap={{ scale: 0.9 }}
                     onClick={triggerFileInput}
                     disabled={uploadingPhoto}
-                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-tent-orange text-white rounded-full flex items-center justify-center hover:bg-orange-600 transition-all duration-200 shadow-lg disabled:opacity-50"
+                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg disabled:opacity-50"
                   >
                     {uploadingPhoto ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     ) : (
-                      <Edit3 size={14} />
+                      <Camera size={14} />
                     )}
                   </motion.button>
                   
@@ -539,242 +427,123 @@ export default function ProfileInfo() {
                   />
                 </div>
                 
-                <div className="flex-1 space-y-3">
-                  <div className="bg-gray-50 rounded-xl p-4 border-2 border-gray-200">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <User className="text-tent-orange" size={20} />
-                      <span className="font-semibold text-gray-800">Información Personal</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-gray-600">Nombre:</span>
-                        <span className="font-medium ml-2">{estudiante.fullName}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Email:</span>
-                        <span className="font-medium ml-2">{estudiante.email}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Teléfono:</span>
-                        <span className="font-medium ml-2">{estudiante.phone}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Código:</span>
-                        <span className="font-mono bg-tent-orange text-white px-2 py-1 rounded ml-2">
-                          {estudiante.accessCode}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-xl p-4 border-2 border-gray-200">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <GraduationCap className="text-green-500" size={20} />
-                      <span className="font-semibold text-gray-800">Información Académica</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-gray-600">Facultad:</span>
-                        <span className="font-medium ml-2">{estudiante.university}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Carrera:</span>
-                        <span className="font-medium ml-2">{estudiante.carrera}</span>
-                      </div>
-                    </div>
-                  </div>
+                {/* Información del usuario */}
+                <div className="text-white mb-2">
+                  <h1 className="text-2xl font-bold">{estudiante?.fullName}</h1>
+                  <p className="text-white/80">{estudiante?.email}</p>
                 </div>
               </div>
-            </div>
-          )}
-        </motion.div>
-
-        {/* Estado de membresía */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white rounded-3xl shadow-2xl p-8"
-        >
-          <div className="flex items-center space-x-3 mb-6">
-            <Shield className="text-tent-orange" size={24} />
-            <h2 className="text-2xl font-bold text-gray-800">Estado de Membresía</h2>
-          </div>
-
-          {estudiante?.membresia && estudiante.plan ? (
-            <div className={`rounded-xl p-6 border-2 ${getEstadoColor(estadoReal)}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  {getEstadoIcon(estadoReal)}
-                  <span className="text-lg font-semibold">{estudiante.membresia.nombre}</span>
-                </div>
-                <span className="text-sm font-medium capitalize px-3 py-1 rounded-full bg-white">
-                  {getEstadoTexto(estadoReal, diasRestantes)}
-                </span>
-              </div>
-              
-              {/* Alerta de vencimiento */}
-              {(estadoReal === 'por_vencer' || estadoReal === 'vencido') && (
-                <div className={`mb-4 p-3 rounded-lg border ${
-                  estadoReal === 'vencido' 
-                    ? 'bg-red-50 border-red-200' 
-                    : 'bg-orange-50 border-orange-200'
-                }`}>
-                  <div className="flex items-center space-x-2">
-                    <AlertTriangle size={16} className={estadoReal === 'vencido' ? 'text-red-600' : 'text-orange-600'} />
-                    <span className={`text-sm font-medium ${
-                      estadoReal === 'vencido' ? 'text-red-800' : 'text-orange-800'
-                    }`}>
-                      {estadoReal === 'vencido' 
-                        ? '¡Tu plan ha vencido! Renovalo para seguir disfrutando del acceso.'
-                        : `¡Tu plan vence pronto! Renovalo antes de ${estudiante.membresia.fechaHasta ? estudiante.membresia.fechaHasta.toDate().toLocaleDateString() : 'la fecha de vencimiento'}.`
-                      }
-                    </span>
-                  </div>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                {/* Fechas de vigencia reales */}
-                {estudiante.membresia.fechaDesde && (
-                  <div className="flex items-center space-x-2">
-                    <Calendar size={16} />
-                    <span>Vigente desde: {estudiante.membresia.fechaDesde.toDate().toLocaleDateString()}</span>
-                  </div>
-                )}
-                {estudiante.membresia.fechaHasta && (
-                  <div className="flex items-center space-x-2">
-                    <Calendar size={16} />
-                    <span className={diasRestantes <= 7 && diasRestantes > 0 ? 'font-semibold text-orange-700' : ''}>
-                      Vigente hasta: {estudiante.membresia.fechaHasta.toDate().toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-                
-                {/* Información adicional */}
-                <div className="flex items-center space-x-2">
-                  <CreditCard size={16} />
-                  <span>Plan: {estudiante.membresia.nombre}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Star size={16} />
-                  <span>Precio: ${planCompleto?.price ? planCompleto.price.toLocaleString() : 'N/A'}</span>
-                </div>
-                {planCompleto && (
-                  <div className="flex items-center space-x-2 md:col-span-2">
-                    <Clock size={16} />
-                    <span>Horarios: {formatearHorario(planCompleto)}</span>
-                  </div>
-                )}
-                {planCompleto?.days && (
-                  <div className="flex items-center space-x-2 md:col-span-2">
-                    <Calendar size={16} />
-                    <span>Días: {planCompleto.days}</span>
-                  </div>
-                )}
-                {estudiante.membresia.montoPagado > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <CreditCard size={16} />
-                    <span>Monto pagado: ${estudiante.membresia.montoPagado.toLocaleString()}</span>
-                  </div>
-                )}
-                {estudiante.membresia.medioPago && (
-                  <div className="flex items-center space-x-2">
-                    <CreditCard size={16} />
-                    <span>Método de pago: {estudiante.membresia.medioPago}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Información de validez */}
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex items-center space-x-2 text-xs text-gray-600">
-                  <Timer size={12} />
-                  <span className="italic">
-                    {estudiante.membresia.fechaDesde && estudiante.membresia.fechaHasta
-                      ? 'Vigencia: 1 mes desde la fecha de pago confirmado'
-                      : 'Vigencia: se activará con el pago confirmado'
-                    }
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-yellow-50 rounded-xl p-6 border-2 border-yellow-200 text-center">
-              <AlertCircle className="text-yellow-600 mx-auto mb-3" size={32} />
-              <p className="text-yellow-700 font-medium">No tenés una membresía activa</p>
-              <p className="text-yellow-600 text-sm mt-1">Explorá nuestros planes disponibles</p>
-            </div>
-          )}
-        </motion.div>
-
-        {/* Planes disponibles */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-3xl shadow-2xl p-8"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <Star className="text-green-500" size={24} />
-              <h2 className="text-2xl font-bold text-gray-800">Planes Disponibles</h2>
-              <span className="bg-tent-orange text-white px-2 py-1 rounded-full text-sm font-medium">
-                ({planes.length})
-              </span>
             </div>
           </div>
 
-          {/* Mensaje si no puede contratar */}
-          {!puedeContratarPlan() && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="text-blue-600" size={16} />
-                <span className="text-sm font-medium text-blue-800">
-                  Ya tenés un plan activo. Los planes se renuevan automáticamente cada mes desde la fecha de pago.
+          {/* Contenido del header */}
+          <div className="p-8 pt-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Crown className="text-yellow-500" size={24} />
+                  <span className="text-lg font-semibold text-gray-800">Perfil de Estudiante</span>
+                </div>
+                <span className="bg-gradient-to-r from-orange-500 to-pink-100 text-black px-3 py-1 rounded-full text-sm font-medium border border-tent-orange">
+                  Código: {estudiante?.accessCode}
                 </span>
               </div>
-            </div>
-          )}
-
-          {planes.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6">
-              {planes.map((plan) => (
-                <PlanCard
-                  key={plan.id}
-                  plan={plan}
-                  onComprar={() => comprarPlan(plan)}
-                  loading={loading}
-                  isDisabled={!puedeContratarPlan()}
+              
+              {estudiante && (
+                <EditProfile
+                  estudiante={estudiante}
+                  onUpdate={handleUpdateEstudiante}
+                  onMessage={setMensaje}
                 />
-              ))}
+              )}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <AlertCircle className="text-gray-400 mx-auto mb-3" size={48} />
-              <p className="text-gray-600">No hay planes disponibles en este momento</p>
+
+            {/* Información básica en cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+                <div className="flex items-center space-x-3">
+                  <User className="text-blue-600" size={20} />
+                  <div>
+                    <span className="text-sm text-blue-700 font-medium">Información Personal</span>
+                    <div className="text-gray-800 font-semibold">{estudiante?.phone}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+                <div className="flex items-center space-x-3">
+                  <Sparkles className="text-green-600" size={20} />
+                  <div>
+                    <span className="text-sm text-green-700 font-medium">Información Académica</span>
+                    <div className="text-gray-800 font-semibold">{estudiante?.university}</div>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
+
+            {/* Mensaje de bienvenida */}
+            <div className="mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-2xl p-6 border border-orange-200">
+              <div className="flex items-center space-x-3 mb-3">
+                <Heart className="text-red-500" size={24} />
+                <h3 className="text-lg font-bold text-gray-800">¡Bienvenido/a de nuevo!</h3>
+              </div>
+              <p className="text-gray-700">
+                Estamos felices de tenerte en nuestra comunidad. Aquí podés gestionar tu membresía, 
+                explorar nuevos planes y mantener actualizada tu información personal.
+              </p>
+            </div>
+          </div>
         </motion.div>
+
+        {/* Componente de Membresía */}
+        {estudiante && (
+          <MembresiaProfile
+            estudiante={estudiante}
+            planes={planes}
+          />
+        )}
+
+        {/* Componente de Planes */}
+        <PlansProfile
+          planes={planes}
+          onComprarPlan={comprarPlan}
+          onSeleccionarMetodoPago={handleSeleccionarMetodoPago}
+          loading={loading}
+          puedeContratarPlan={puedeContratarPlan()}
+          estudianteConPlan={!!estudiante?.plan}
+        />
 
         {/* Botón de cerrar sesión */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.4 }}
           className="text-center"
         >
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={cerrarSesion}
-            className="flex items-center space-x-2 mx-auto px-6 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-all duration-200"
+            className="flex items-center space-x-3 mx-auto px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             <LogOut size={20} />
             <span>Cerrar Sesión</span>
           </motion.button>
         </motion.div>
       </div>
+
+      {/* Modal de selección de método de pago */}
+      <PaymentProfile
+        plan={selectedPlan}
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedPlan(null);
+        }}
+        onPayWithMercadoPago={handlePayWithMercadoPago}
+        onPayWithCash={handlePayWithCash}
+        loading={paymentLoading}
+      />
 
       {/* Modal de mensaje */}
       <AnimatePresence>
@@ -789,30 +558,30 @@ export default function ProfileInfo() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-white rounded-3xl p-8 max-w-sm w-full text-center"
+              className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl"
             >
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
                 mensaje.includes('Error') || mensaje.includes('error') 
                   ? 'bg-red-100' 
                   : 'bg-green-100'
               }`}>
                 {mensaje.includes('Error') || mensaje.includes('error') ? (
-                  <XCircle className="text-red-600" size={32} />
+                  <XCircle className="text-red-600" size={40} />
                 ) : (
-                  <CheckCircle className="text-green-600" size={32} />
+                  <CheckCircle className="text-green-600" size={40} />
                 )}
               </div>
               
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                {mensaje.includes('Error') || mensaje.includes('error') ? '¡Oops!' : '¡Información!'}
+              <h3 className="text-2xl font-bold text-gray-800 mb-3">
+                {mensaje.includes('Error') || mensaje.includes('error') ? '¡Oops!' : '¡Perfecto!'}
               </h3>
-              <p className="text-gray-600 mb-6">{mensaje}</p>
+              <p className="text-gray-600 mb-8 leading-relaxed">{mensaje}</p>
               
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setMensaje(null)}
-                className="w-full py-3 bg-tent-orange text-white rounded-xl font-medium hover:bg-orange-600 transition-all duration-200"
+                className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200"
               >
                 Continuar
               </motion.button>

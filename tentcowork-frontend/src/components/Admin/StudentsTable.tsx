@@ -9,8 +9,6 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
-  Edit2,
-  X,
   Mail,
   Phone,
   GraduationCap,
@@ -19,33 +17,34 @@ import {
   Trash2,
   Download,
   User,
-  Save,
   AlertTriangle,
   CreditCard
 } from 'lucide-react';
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import * as XLSX from 'xlsx';
+import { Timestamp } from 'firebase-admin/firestore';
+
 
 interface Student {
   id: string;
   fullName: string;
   email: string;
   phone?: string;
-  university?: string; // Campo legacy para compatibilidad
+  university?: string;
   carrera?: string;
   certificado: boolean;
-  plan?: string; // Este es el campo principal para el plan
+  plan?: string;
   membresia?: {
     nombre?: string;
     estado?: string;
+    fechaDesde?: Timestamp;
+    fechaHasta?: Timestamp;
     montoPagado?: number;
     medioPago?: string;
   };
   profilePhoto?: string;
-  lastActivity?: string;
-  joinDate?: string;
-  createdAt?: string;
+  createdAt?: Timestamp;
   accessCode?: string;
   activo?: boolean;
   isCheckedIn?: boolean;
@@ -53,18 +52,46 @@ interface Student {
   fotoURL?: string;
 }
 
-interface EditFormData {
-  fullName: string;
-  email: string;
-  phone: string;
-  university: string;
-  carrera: string;
-  certificado: boolean;
-  plan: string;
-  [key: string]: any; // Permitir propiedades adicionales para Firebase
+// Interfaz para los planes dinámicos
+interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  days: string;
+  startHour: string;
+  endHour: string;
 }
 
-// Universidades disponibles
+// Props del componente
+interface StudentsTableProps {
+  availablePlans?: Plan[];
+}
+// Función helper para formatear fecha
+const formatDate = (timestamp: any) => {
+  if (!timestamp) return 'No registrada';
+  
+  try {
+    // Si es un timestamp de Firebase
+    if (timestamp.seconds) {
+      return new Date(timestamp.seconds * 1000).toLocaleDateString('es-AR');
+    }
+    // Si es una fecha normal
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleDateString('es-AR');
+    }
+    // Si es un string de fecha
+    if (typeof timestamp === 'string') {
+      return new Date(timestamp).toLocaleDateString('es-AR');
+    }
+    return 'No registrada';
+  } catch (error) {
+    console.error('Error formateando fecha:', error);
+    return 'No registrada';
+  }
+};
+
+
 const universities = [
   { value: 'UNCUYO', label: 'Universidad Nacional de Cuyo (UNCUYO)' },
   { value: 'UTN', label: 'Universidad Tecnológica Nacional (UTN)' },
@@ -82,14 +109,7 @@ const universities = [
   { value: 'Otra', label: 'Otra' }
 ];
 
-// Planes disponibles
-const planes = [
-  { value: 'full', label: 'Full' },
-  { value: 'partime', label: 'Part-time' },
-  { value: 'diario', label: 'Diario' },
-];
-
-const StudentsTable = () => {
+const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
@@ -98,19 +118,8 @@ const StudentsTable = () => {
   const [sortConfig, setSortConfig] = useState({ key: 'fullName', direction: 'asc' });
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [showFilters, setShowFilters] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState<EditFormData>({
-    fullName: '',
-    email: '',
-    phone: '',
-    university: '',
-    carrera: '',
-    certificado: false,
-    plan: ''
-  });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showDeleteMultipleConfirm, setShowDeleteMultipleConfirm] = useState(false);
-  const [updating, setUpdating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [filters, setFilters] = useState({
     name: '',
@@ -121,7 +130,24 @@ const StudentsTable = () => {
     plan: '',
   });
 
-  // Función helper para obtener la universidad (compatibilidad con university)
+  // Función para obtener los planes dinámicamente
+  const planes = useMemo(() => {
+    if (availablePlans.length === 0) {
+      // Fallback a planes estáticos si no hay planes disponibles
+      return [
+        { value: 'full', label: 'Full' },
+        { value: 'partime', label: 'Part-time' },
+        { value: 'diario', label: 'Diario' },
+      ];
+    }
+    
+    return availablePlans.map(plan => ({
+      value: plan.id,
+      label: plan.name
+    }));
+  }, [availablePlans]);
+
+  // Función helper para obtener la universidad
   const getStudentuniversity = (student: Student) => {
     return student.university || '';
   };
@@ -142,7 +168,17 @@ const StudentsTable = () => {
 
   // Función helper para obtener el nombre de membresía
   const getMembershipName = (student: Student) => {
-    return student.membresia?.nombre || student.plan || 'Sin plan';
+    if (student.membresia?.nombre) return student.membresia.nombre;
+    
+    // Buscar el nombre del plan en los planes disponibles
+    const planInfo = availablePlans.find(p => p.id === student.plan);
+    if (planInfo) return planInfo.name;
+    
+    // Fallback a planes estáticos
+    const staticPlan = planes.find(p => p.value === student.plan);
+    if (staticPlan) return staticPlan.label;
+    
+    return student.plan || 'Sin plan';
   };
 
   useEffect(() => {
@@ -254,34 +290,25 @@ const StudentsTable = () => {
         'Teléfono': student.phone || 'No registrado',
         'Universidad': getuniversityLabel(getStudentuniversity(student)),
         'Carrera': student.carrera || 'No especificada',
-        'Plan Contratado': student.plan || 'Sin plan',
+        'Plan Contratado': getMembershipName(student),
+        'Vigencia Desde': formatDate(student.membresia?.fechaDesde),
+        'Vigencia Hasta': formatDate(student.membresia?.fechaHasta),
         'Estado Membresía': student.membresia?.estado || 'No definido',
         'Tipo Membresía': student.membresia?.nombre || 'No definido',
         'Certificado': student.certificado ? 'Alumno Regular' : 'No certificado',
         'Monto Pagado': student.membresia?.montoPagado || 0,
         'Medio de Pago': student.membresia?.medioPago || 'No especificado',
-        'Fecha de Registro': student.joinDate || 'No registrada',
-        'Última Actividad': student.lastActivity || 'No registrada'
+        'Fecha de Registro': formatDate(student.createdAt),
+    
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
       const workbook = XLSX.utils.book_new();
       
-      // Ajustar ancho de columnas
       const colWidths = [
-        { wch: 25 }, // Nombre Completo
-        { wch: 30 }, // Email
-        { wch: 15 }, // Teléfono
-        { wch: 35 }, // Universidad
-        { wch: 25 }, // Carrera
-        { wch: 15 }, // Plan Contratado
-        { wch: 15 }, // Estado Membresía
-        { wch: 15 }, // Tipo Membresía
-        { wch: 15 }, // Certificado
-        { wch: 12 }, // Monto Pagado
-        { wch: 15 }, // Medio de Pago
-        { wch: 15 }, // Fecha de Registro
-        { wch: 15 }  // Última Actividad
+        { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 35 }, { wch: 25 },
+        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 },
+        { wch: 15 }, { wch: 15 }, { wch: 15 }
       ];
       worksheet['!cols'] = colWidths;
 
@@ -295,75 +322,6 @@ const StudentsTable = () => {
       setExporting(false);
     }
   }, [filteredAndSortedStudents]);
-
-  // Función para iniciar la edición
-  const handleEditStudent = (student: Student) => {
-    setEditingStudent(student.id);
-    setEditFormData({
-      fullName: student.fullName,
-      email: student.email,
-      phone: student.phone || '',
-      university: getStudentuniversity(student),
-      carrera: student.carrera || '',
-      certificado: student.certificado,
-      plan: student.plan || ''
-    });
-  };
-
-  // Función para guardar cambios - CORREGIDA
-  const handleSaveEdit = async () => {
-    if (!editingStudent) return;
-    
-    setUpdating(true);
-    try {
-      const studentRef = doc(db, 'students', editingStudent);
-      
-      // DEBUG: Verifica qué datos se van a actualizar
-      console.log('Datos a actualizar:', editFormData);
-      console.log('Plan a actualizar:', editFormData.plan);
-      
-      const updateData = { ...editFormData } as Partial<Student>;
-      await updateDoc(studentRef, updateData);
-      
-      // Actualizar el estado local
-      setStudents(prev => prev.map(student => 
-        student.id === editingStudent 
-          ? { ...student, ...editFormData }
-          : student
-      ));
-      
-      console.log('Estudiante actualizado exitosamente');
-      
-      setEditingStudent(null);
-      setEditFormData({
-        fullName: '',
-        email: '',
-        phone: '',
-        university: '',
-        carrera: '',
-        certificado: false,
-        plan: ''
-      });
-    } catch (error) {
-      console.error("Error al actualizar estudiante:", error);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  // Función para cancelar edición
-  const handleCancelEdit = () => {
-    setEditingStudent(null);
-    setEditFormData({
-      fullName: '',
-      email: '',
-      phone: '',
-      university: '',
-      carrera: '',
-      certificado: false,
-      plan: ''
-    });
-  };
 
   // Función para eliminar estudiante
   const handleDeleteStudent = async (studentId: string) => {
@@ -427,8 +385,28 @@ const StudentsTable = () => {
     }
   };
 
-  const getPlanColor = (plan: string) => {
-    switch (plan) {
+  // Función para obtener el color del plan
+  const getPlanColor = (planId: string) => {
+    if (!planId) return 'bg-gray-100 text-gray-700 border-gray-200';
+    
+    // Buscar el plan en los planes disponibles
+    const planInfo = availablePlans.find(p => p.id === planId);
+    if (planInfo) {
+      // Usar hash del ID para generar colores consistentes
+      const hash = planInfo.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+      const colors = [
+        'bg-purple-100 text-purple-700 border-purple-200',
+        'bg-blue-100 text-blue-700 border-blue-200',
+        'bg-orange-100 text-orange-700 border-orange-200',
+        'bg-green-100 text-green-700 border-green-200',
+        'bg-pink-100 text-pink-700 border-pink-200',
+        'bg-indigo-100 text-indigo-700 border-indigo-200',
+      ];
+      return colors[hash % colors.length];
+    }
+    
+    // Fallback para planes estáticos
+    switch (planId) {
       case 'full': return 'bg-purple-100 text-purple-700 border-purple-200';
       case 'partime': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'diario': return 'bg-orange-100 text-orange-700 border-orange-200';
@@ -470,51 +448,51 @@ const StudentsTable = () => {
       className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
     >
       {/* Header con estadísticas */}
-        <div className="bg-gradient-to-r from-tent-orange to-tent-orange p-6">
-          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
-            <div className="flex items-center space-x-3">
-              <div className="bg-white/20 rounded-xl p-2">
-                <Users className="text-white" size={24} />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-white">Estudiantes Registrados</h2>
-                <p className="text-orange-100 text-sm">Gestión de estudiantes y membresías</p>
-              </div>
+      <div className="bg-gradient-to-r from-tent-orange to-tent-orange p-6">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
+          <div className="flex items-center space-x-3">
+            <div className="bg-white/20 rounded-xl p-2">
+              <Users className="text-white" size={24} />
             </div>
-            
-            <div className="flex items-center space-x-2">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowFilters(!showFilters)}
-                className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2"
-              >
-                <Filter size={16} />
-                <span>Filtros</span>
-              </motion.button>
-              
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-                className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2"
-              >
-                <Eye size={16} />
-                <span>{viewMode === 'table' ? 'Tarjetas' : 'Tabla'}</span>
-              </motion.button>
-              
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleExportToExcel}
-                disabled={exporting}
-                className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
-              >
-                <Download size={16} />
-                <span>{exporting ? 'Exportando...' : 'Exportar Excel'}</span>
-              </motion.button>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Estudiantes Registrados</h2>
+              <p className="text-orange-100 text-sm">Visualización de estudiantes y membresías</p>
             </div>
           </div>
+          
+          <div className="flex items-center space-x-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowFilters(!showFilters)}
+              className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2"
+            >
+              <Filter size={16} />
+              <span>Filtros</span>
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
+              className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2"
+            >
+              <Eye size={16} />
+              <span>{viewMode === 'table' ? 'Tarjetas' : 'Tabla'}</span>
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleExportToExcel}
+              disabled={exporting}
+              className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
+            >
+              <Download size={16} />
+              <span>{exporting ? 'Exportando...' : 'Exportar Excel'}</span>
+            </motion.button>
+          </div>
+        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
@@ -644,193 +622,107 @@ const StudentsTable = () => {
  
         {viewMode === 'table' ? (
           /* Vista de tabla */
-       <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-gradient-to-r from-[#014023] to-tent-green">
-                <tr>
-                  <th className="px-4 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedStudents.size === paginatedStudents.length && paginatedStudents.length > 0}
-                      onChange={handleSelectAll}
-                      className="rounded border-tent-green text-orange-600 focus:ring-orange-500"
-                    />
-                  </th>
-                  <th 
-                    className="px-4 py-3 text-left font-medium text-white cursor-pointer hover:bg-green-900"
-                    onClick={() => handleSort('fullName')}
-                  >
-                    Nombre
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-white">Teléfono</th>
-                  <th 
-                    className="px-4 py-3 text-left font-medium text-white cursor-pointer hover:bg-green-900"
-                    onClick={() => handleSort('university')}
-                  >
-                    Universidad
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-white">Carrera</th>
-                  <th className="px-4 py-3 text-left font-medium text-white">Plan</th>
-                  <th className="px-4 py-3 text-left font-medium text-white">Estado</th>
-                  <th className="px-4 py-3 text-left font-medium text-white">Tipo Alumno</th>
-                  <th className="px-4 py-3 text-left font-medium text-white">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gradient-to-r from-[#014023] to-tent-green">
+                  <tr>
+                    <th className="px-4 py-3 text-left">
                       <input
                         type="checkbox"
-                        checked={selectedStudents.has(student.id)}
-                        onChange={() => handleSelectStudent(student.id)}
-                        className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                        checked={selectedStudents.size === paginatedStudents.length && paginatedStudents.length > 0}
+                        onChange={handleSelectAll}
+                        className="rounded border-tent-green text-orange-600 focus:ring-orange-500"
                       />
-                    </td>
-                    <td className="px-4 py-4">
-                      {editingStudent === student.id ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editFormData.fullName}
-                            onChange={(e) => setEditFormData({...editFormData, fullName: e.target.value})}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
-                          <input
-                            type="email"
-                            value={editFormData.email}
-                            onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
-                        </div>
-                      ) : (
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-left font-medium text-white cursor-pointer hover:bg-green-900"
+                      onClick={() => handleSort('fullName')}
+                    >
+                      Nombre
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-white">Teléfono</th>
+                    <th 
+                      className="px-4 py-3 text-left font-medium text-white cursor-pointer hover:bg-green-900"
+                      onClick={() => handleSort('university')}
+                    >
+                      Universidad
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-white">Carrera</th>
+                    <th className="px-4 py-3 text-left font-medium text-white">Plan</th>
+                    <th className="px-4 py-3 text-left font-medium text-white">Estado</th>
+                    <th className="px-4 py-3 text-left font-medium text-white">Tipo Alumno</th>
+                    <th className="px-4 py-3 text-left font-medium text-white">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedStudents.map((student) => (
+                    <tr key={student.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudents.has(student.id)}
+                          onChange={() => handleSelectStudent(student.id)}
+                          className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                        />
+                      </td>
+                      <td className="px-4 py-4">
                         <div>
                           <div className="font-medium text-gray-900">{student.fullName}</div>
                           <div className="text-sm text-gray-500">{student.email}</div>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      {editingStudent === student.id ? (
-                        <input
-                          type="text"
-                          value={editFormData.phone}
-                          onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        />
-                      ) : (
+                      </td>
+                      <td className="px-4 py-4">
                         <div className="flex items-center text-sm text-gray-900">
                           <Phone size={14} className="mr-1" />
                           {student.phone || 'No registrado'}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      {editingStudent === student.id ? (
-                        <select
-                          value={editFormData.university}
-                          onChange={(e) => setEditFormData({...editFormData, university: e.target.value})}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        >
-                          {universities.map(uni => (
-                            <option key={uni.value} value={uni.value}>{uni.label}</option>
-                          ))}
-                        </select>
-                      ) : (
+                      </td>
+                      <td className="px-4 py-4">
                         <span className="text-sm text-gray-900">
                           {getuniversityLabel(getStudentuniversity(student))}
                         </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      {editingStudent === student.id ? (
-                        <input
-                          type="text"
-                          value={editFormData.carrera}
-                          onChange={(e) => setEditFormData({...editFormData, carrera: e.target.value})}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        />
-                      ) : (
+                      </td>
+                      <td className="px-4 py-4">
                         <span className="text-sm text-gray-900">{student.carrera || 'No especificada'}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      {editingStudent === student.id ? (
-                        <select
-                          value={editFormData.plan}
-                          onChange={(e) => setEditFormData({...editFormData, plan: e.target.value})}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        >
-                          <option value="">Sin plan</option>
-                          {planes.map(plan => (
-                            <option key={plan.value} value={plan.value}>{plan.label}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPlanColor(student.plan || 'Sin plan')}`}>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPlanColor(student.plan || '')}`}>
                           <CreditCard size={12} className="mr-1" />
-                          {planes.find(p => p.value === student.plan)?.label || student.plan || 'Sin plan'}
+                          {getMembershipName(student)}
                         </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(getMembershipStatus(student))}`}>
-                        {getEstadoIcon(getMembershipStatus(student))}
-                        <span className="ml-1">{getMembershipStatus(student)}</span>
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <button
-                        onClick={() => toggleCertificado(student.id, student.certificado)}
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-                          student.certificado ? 'bg-green-100 text-tent-green hover:bg-green-200' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        }`}
-                      >
-                        <Award size={12} className="mr-1" />
-                        {student.certificado ? 'Alumno Regular' : 'No certificado'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-4">
-                      {editingStudent === student.id ? (
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={handleSaveEdit}
-                            disabled={updating}
-                            className="text-green-600 hover:text-tent-green p-1 rounded disabled:opacity-50"
-                          >
-                            <Save size={16} />
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="text-gray-600 hover:text-gray-900 p-1 rounded"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleEditStudent(student)}
-                            className="text-orange-600 hover:text-orange-900 p-1 rounded"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => setShowDeleteConfirm(student.id)}
-                            className="text-red-600 hover:text-red-900 p-1 rounded"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(getMembershipStatus(student))}`}>
+                          {getEstadoIcon(getMembershipStatus(student))}
+                          <span className="ml-1">{getMembershipStatus(student)}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => toggleCertificado(student.id, student.certificado)}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                            student.certificado ? 'bg-green-100 text-tent-green hover:bg-green-200' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          }`}
+                        >
+                          <Award size={12} className="mr-1" />
+                          {student.certificado ? 'Alumno Regular' : 'No certificado'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => setShowDeleteConfirm(student.id)}
+                          className="text-red-600 hover:text-red-900 p-1 rounded"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
         ) : (
           /* Vista de tarjetas */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -855,30 +747,11 @@ const StudentsTable = () => {
                       )}
                     </div>
                     <div className="flex-1">
-                      {editingStudent === student.id ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editFormData.fullName}
-                            onChange={(e) => setEditFormData({...editFormData, fullName: e.target.value})}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-semibold"
-                          />
-                          <input
-                            type="email"
-                            value={editFormData.email}
-                            onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          <h3 className="font-semibold text-gray-900 mb-1">{student.fullName}</h3>
-                          <p className="text-sm text-gray-600 flex items-center">
-                            <Mail size={12} className="mr-1" />
-                            {student.email}
-                          </p>
-                        </>
-                      )}
+                      <h3 className="font-semibold text-gray-900 mb-1">{student.fullName}</h3>
+                      <p className="text-sm text-gray-600 flex items-center">
+                        <Mail size={12} className="mr-1" />
+                        {student.email}
+                      </p>
                     </div>
                   </div>
                   <input
@@ -892,70 +765,27 @@ const StudentsTable = () => {
                 <div className="space-y-2">
                   <div className="flex items-center text-sm text-gray-600">
                     <Phone size={14} className="mr-2" />
-                    {editingStudent === student.id ? (
-                      <input
-                        type="text"
-                        value={editFormData.phone}
-                        onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
-                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                      />
-                    ) : (
-                      student.phone || 'No registrado'
-                    )}
+                    {student.phone || 'No registrado'}
                   </div>
                   
                   <div className="flex items-center text-sm text-gray-600">
                     <GraduationCap size={14} className="mr-2" />
-                    {editingStudent === student.id ? (
-                      <select
-                        value={editFormData.university}
-                        onChange={(e) => setEditFormData({...editFormData, university: e.target.value})}
-                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                      >
-                        {universities.map(uni => (
-                          <option key={uni.value} value={uni.value}>{uni.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      getuniversityLabel(getStudentuniversity(student))
-                    )}
+                    {getuniversityLabel(getStudentuniversity(student))}
                   </div>
                   
-                  {(student.carrera || editingStudent === student.id) && (
+                  {student.carrera && (
                     <div className="flex items-center text-sm text-gray-600">
                       <span className="mr-2">📚</span>
-                      {editingStudent === student.id ? (
-                        <input
-                          type="text"
-                          value={editFormData.carrera}
-                          onChange={(e) => setEditFormData({...editFormData, carrera: e.target.value})}
-                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                        />
-                      ) : (
-                        student.carrera
-                      )}
+                      {student.carrera}
                     </div>
                   )}
                   
                   {/* Plan contratado */}
                   <div className="flex items-center justify-between mt-3">
-                    {editingStudent === student.id ? (
-                      <select
-                        value={editFormData.plan}
-                        onChange={(e) => setEditFormData({...editFormData, plan: e.target.value})}
-                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                      >
-                        <option value="">Sin plan</option>
-                        {planes.map(plan => (
-                          <option key={plan.value} value={plan.value}>{plan.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPlanColor(student.plan || 'Sin plan')}`}>
-                        <CreditCard size={12} className="mr-1" />
-                        {planes.find(p => p.value === student.plan)?.label || student.plan || 'Sin plan'}
-                      </span>
-                    )}
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPlanColor(student.plan || '')}`}>
+                      <CreditCard size={12} className="mr-1" />
+                      {getMembershipName(student)}
+                    </span>
                   </div>
                   
                   {/* Estado y certificado */}
@@ -965,65 +795,28 @@ const StudentsTable = () => {
                       <span className="ml-1">{getMembershipStatus(student)}</span>
                     </span>
                     
-                    {editingStudent === student.id ? (
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={editFormData.certificado}
-                          onChange={(e) => setEditFormData({...editFormData, certificado: e.target.checked})}
-                          className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="text-xs">Regular</span>
-                      </label>
-                    ) : (
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        student.certificado ? 'bg-green-100 text-tent-green' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        <Award size={12} className="mr-1" />
-                        {student.certificado ? 'Regular' : 'No cert.'}
-                      </span>
-                    )}
+                    <button
+                      onClick={() => toggleCertificado(student.id, student.certificado)}
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                        student.certificado ? 'bg-green-100 text-tent-green hover:bg-green-200' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                      }`}
+                    >
+                      <Award size={12} className="mr-1" />
+                      {student.certificado ? 'Regular' : 'No cert.'}
+                    </button>
                   </div>
                 </div>
                 
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
                   <span className="text-sm font-medium text-gray-900">
-                    {student.membresia?.nombre || student.plan || 'Sin plan'}
+                    {getMembershipName(student)}
                   </span>
-                  <div className="flex space-x-2">
-                    {editingStudent === student.id ? (
-                      <>
-                        <button
-                          onClick={handleSaveEdit}
-                          disabled={updating}
-                          className="text-green-600 hover:text-tent-green p-1 rounded disabled:opacity-50"
-                        >
-                          <Save size={14} />
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          className="text-gray-600 hover:text-gray-900 p-1 rounded"
-                        >
-                          <X size={14} />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button 
-                          onClick={() => handleEditStudent(student)}
-                          className="text-orange-600 hover:text-orange-900 p-1 rounded"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button 
-                          onClick={() => setShowDeleteConfirm(student.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  <button 
+                    onClick={() => setShowDeleteConfirm(student.id)}
+                    className="text-red-600 hover:text-red-900 p-1 rounded"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </motion.div>
             ))}

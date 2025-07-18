@@ -14,7 +14,7 @@ import PaymentsTable from './PaymentsTable';
 import SessionsTable from './SessionsTable';
 import EstadisticasAdmin from './EstadisticasAdmin';
 import PlansEditor from './PlansEditor';
-import AdminDashboard from './AdminDashboard'; // El que acabamos de crear
+import AdminDashboard from './AdminDashboard'; 
 
 const AdminLayout: React.FC = () => {
   const [user, setUser] = useState<any>(null);
