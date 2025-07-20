@@ -20,7 +20,11 @@ import {
   EyeOff,
   Eye,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Clock,
+  Sun,
+  CalendarDays,
+  Info
 } from 'lucide-react';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -63,18 +67,16 @@ interface Student {
     montoPagado: number;
     nombre?: string;
     estado?: string;
-    fechaDesde?: Timestamp; // Solo estos 2 campos como Timestamp
+    fechaDesde?: Timestamp;
     fechaHasta?: Timestamp;
   };
 }
 
 const SUPER_ADMINS = [
-  'leandropetricca123@gmail.com',  // Tu email
-  // Agregar más emails de super-admins si necesariox 
+  'leandropetricca123@gmail.com',
 ];
-const currentUserEmail = 'leandropetricca123@gmail.com'; // 🔑 Tu email real
+const currentUserEmail = 'leandropetricca123@gmail.com';
 const isSuperAdmin = SUPER_ADMINS.includes(currentUserEmail);
-
 
 const PaymentsTable: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -87,7 +89,7 @@ const PaymentsTable: React.FC = () => {
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [filters, setFilters] = useState({
     name: '',
@@ -109,6 +111,62 @@ const PaymentsTable: React.FC = () => {
   });
 
   const paymentMethods = ['Efectivo', 'Mercado Pago Transferencia', 'Mercado Pago Posnet','Mercado Pago Hospedado'];
+
+  // ✅ NUEVA FUNCIÓN: Detectar si es pase diario
+  const isPaseDiario = (planName: string, price: number = 0) => {
+    const nombre = planName.toLowerCase();
+    return nombre.includes('diario') || 
+           nombre.includes('día') || 
+           nombre.includes('day') ||
+           (nombre.includes('pase') && (nombre.includes('diario') || nombre.includes('día'))) ||
+           price <= 8000;
+  };
+
+  // ✅ NUEVA FUNCIÓN: Calcular fechas según tipo de plan
+  const calcularFechasPlan = (planName: string, price: number, fechaPago: Date) => {
+    let fechaDesde: Date;
+    let fechaHasta: Date;
+
+    if (isPaseDiario(planName, price)) {
+      // Para pase diario: desde el momento del pago hasta las 23:59:59 del mismo día
+      fechaDesde = new Date(fechaPago);
+      fechaHasta = new Date(fechaPago);
+      fechaHasta.setHours(23, 59, 59, 999); // Hasta las 23:59:59.999
+      
+      console.log(`📅 Pase Diario: ${planName}`);
+      console.log(`⏰ Desde: ${fechaDesde.toLocaleString()}`);
+      console.log(`⏰ Hasta: ${fechaHasta.toLocaleString()}`);
+    } else {
+      // Para planes mensuales: desde la fecha del pago hasta 30 días después
+      fechaDesde = new Date(fechaPago);
+      fechaHasta = new Date(fechaPago);
+      fechaHasta.setDate(fechaHasta.getDate() + 30); // 30 días
+      
+      console.log(`📅 Plan Mensual: ${planName}`);
+      console.log(`⏰ Desde: ${fechaDesde.toLocaleString()}`);
+      console.log(`⏰ Hasta: ${fechaHasta.toLocaleString()}`);
+    }
+
+    return {
+      fechaDesde: Timestamp.fromDate(fechaDesde),
+      fechaHasta: Timestamp.fromDate(fechaHasta)
+    };
+  };
+
+  // ✅ NUEVA FUNCIÓN: Obtener información del tipo de plan seleccionado
+  const getSelectedPlanInfo = () => {
+    if (!newPayment.plan) return null;
+    
+    const selectedPlan = plans.find(p => p.name === newPayment.plan);
+    if (!selectedPlan) return null;
+    
+    const esDialo = isPaseDiario(selectedPlan.name, selectedPlan.price);
+    return {
+      plan: selectedPlan,
+      esDiario: esDialo,
+      vigencia: esDialo ? 'hasta las 23:59 del día' : '30 días desde el pago'
+    };
+  };
 
   useEffect(() => {
     fetchPayments();
@@ -252,134 +310,148 @@ const PaymentsTable: React.FC = () => {
   };
 
   const handleAddPayment = async () => {
-  // 🚫 PREVENIR DOBLE ENVÍO
-  if (isSubmitting) {
-    console.log('Ya se está procesando un pago...');
-    return;
-  }
-
-  try {
-    setIsSubmitting(true); // 🔒 Bloquear más envíos
-
-    // Validaciones antes de proceder
-    if (!newPayment.fullName) {
-      alert('Debe seleccionar un estudiante');
-      return;
-    }
-    if (!newPayment.plan) {
-      alert('Debe seleccionar un plan');
-      return;
-    }
-    if (!newPayment.method) {
-      alert('Debe seleccionar un método de pago');
-      return;
-    }
-    if (newPayment.amount <= 0) {
-      alert('El monto debe ser mayor a 0');
-      return;
-    }
-    if (!newPayment.studentId) {
-      alert('Error: No se pudo identificar al estudiante. Intente seleccionarlo nuevamente.');
+    if (isSubmitting) {
+      console.log('Ya se está procesando un pago...');
       return;
     }
 
-    const paymentData = {
-      fullName: newPayment.fullName,
-      amount: newPayment.amount,
-      method: newPayment.method,
-      date: newPayment.date || new Date().toISOString().split('T')[0],
-      facturado: newPayment.facturado,
-      plan: newPayment.plan,
-      studentId: newPayment.studentId,
-    };
-
-    console.log('=== AGREGANDO PAGO ===');
-    console.log('Datos del pago:', paymentData);
-
-    // Agregar el pago
-    const docRef = await addDoc(collection(db, 'payments'), paymentData);
-    console.log('✅ Pago agregado con ID:', docRef.id);
-    
-    // Actualizar el plan del estudiante CON FECHAS DE VIGENCIA
-    console.log('=== ACTUALIZANDO PLAN DEL ESTUDIANTE ===');
-    console.log('ID del estudiante:', newPayment.studentId);
-    console.log('Nuevo plan:', newPayment.plan);
-    
-    const studentRef = doc(db, 'students', newPayment.studentId);
-    
     try {
-      // Calcular fechas de vigencia usando Timestamp
-      const fechaPago = new Date(newPayment.date);
-      const fechaDesde = Timestamp.fromDate(fechaPago); // Fecha del pago como Timestamp
-      const fechaHasta = Timestamp.fromDate(new Date(fechaPago.getTime() + 30 * 24 * 60 * 60 * 1000)); // Un mes después como Timestamp
-      
-      console.log('Fechas calculadas:');
-      console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
-      console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
-      
-      // Actualizar el estudiante con las fechas de vigencia como Timestamp
-      const updateData: any = {
+      setIsSubmitting(true);
+
+      // Validaciones
+      if (!newPayment.fullName) {
+        alert('Debe seleccionar un estudiante');
+        return;
+      }
+      if (!newPayment.plan) {
+        alert('Debe seleccionar un plan');
+        return;
+      }
+      if (!newPayment.method) {
+        alert('Debe seleccionar un método de pago');
+        return;
+      }
+      if (newPayment.amount <= 0) {
+        alert('El monto debe ser mayor a 0');
+        return;
+      }
+      if (!newPayment.studentId) {
+        alert('Error: No se pudo identificar al estudiante. Intente seleccionarlo nuevamente.');
+        return;
+      }
+
+      const paymentData = {
+        fullName: newPayment.fullName,
+        amount: newPayment.amount,
+        method: newPayment.method,
+        date: newPayment.date || new Date().toISOString().split('T')[0],
+        facturado: newPayment.facturado,
         plan: newPayment.plan,
-        'membresia.nombre': newPayment.plan,
-        'membresia.estado': 'activa',
-        'membresia.montoPagado': newPayment.amount,
-        'membresia.medioPago': newPayment.method,
-        'membresia.fechaDesde': fechaDesde, // Timestamp directo
-        'membresia.fechaHasta': fechaHasta, // Timestamp directo
-        activo: true
+        studentId: newPayment.studentId,
       };
+
+      console.log('=== AGREGANDO PAGO ===');
+      console.log('Datos del pago:', paymentData);
+
+      // Agregar el pago
+      const docRef = await addDoc(collection(db, 'payments'), paymentData);
+      console.log('✅ Pago agregado con ID:', docRef.id);
       
-      console.log('Datos de actualización del estudiante:', updateData);
-      await updateDoc(studentRef, updateData);
-      console.log('✅ Plan y membresía del estudiante actualizados exitosamente');
+      // ✅ MEJORADO: Actualizar el plan del estudiante CON FECHAS ESPECÍFICAS SEGÚN TIPO DE PLAN
+      console.log('=== ACTUALIZANDO PLAN DEL ESTUDIANTE ===');
+      console.log('ID del estudiante:', newPayment.studentId);
+      console.log('Nuevo plan:', newPayment.plan);
       
-      // Verificar que se actualizó correctamente
-      const updatedStudent = await getDoc(studentRef);
-      if (updatedStudent.exists()) {
-        const data = updatedStudent.data();
-        console.log('✅ Verificación - Datos actualizados en Firebase:');
-        console.log('  - Plan:', data.plan);
-        console.log('  - Membresía:', data.membresia);
-        console.log('  - Activo:', data.activo);
+      const studentRef = doc(db, 'students', newPayment.studentId);
+      
+      try {
+        // ✅ CORREGIDO: Manejar fechas correctamente sin problemas de zona horaria
+        const fechaPagoString = newPayment.date; // "2025-07-20" formato
+        const fechaPago = new Date(fechaPagoString + 'T12:00:00'); // Agregar hora del mediodía
+        
+        const selectedPlan = plans.find(p => p.name === newPayment.plan);
+        const { fechaDesde, fechaHasta } = calcularFechasPlan(
+          newPayment.plan, 
+          selectedPlan?.price || 0, 
+          fechaPago
+        );
+        
+        console.log('Fechas calculadas según tipo de plan:');
+        console.log('  - Plan:', newPayment.plan);
+        console.log('  - Es pase diario:', isPaseDiario(newPayment.plan, selectedPlan?.price || 0));
+        console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
+        console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
+        console.log('  - Fecha desde (local):', fechaDesde.toDate().toLocaleDateString());
+        console.log('  - Fecha hasta (local):', fechaHasta.toDate().toLocaleDateString());
+        
+        const updateData: any = {
+          plan: newPayment.plan,
+          'membresia.nombre': newPayment.plan,
+          'membresia.estado': 'activa',
+          'membresia.montoPagado': newPayment.amount,
+          'membresia.medioPago': newPayment.method,
+          'membresia.fechaDesde': fechaDesde,
+          'membresia.fechaHasta': fechaHasta,
+          activo: true
+        };
+        
+        console.log('Datos de actualización del estudiante:', updateData);
+        await updateDoc(studentRef, updateData);
+        console.log('✅ Plan y membresía del estudiante actualizados exitosamente');
+        
+        // Verificar que se actualizó correctamente
+        const updatedStudent = await getDoc(studentRef);
+        if (updatedStudent.exists()) {
+          const data = updatedStudent.data();
+          console.log('✅ Verificación - Datos actualizados en Firebase:');
+          console.log('  - Plan:', data.plan);
+          console.log('  - Membresía:', data.membresia);
+          console.log('  - Activo:', data.activo);
+        }
+        
+      } catch (updateError: any) {
+        console.error('❌ Error al actualizar el estudiante:', updateError);
+        console.error('Código de error:', updateError.code);
+        console.error('Mensaje:', updateError.message);
+        alert('El pago se agregó pero no se pudo actualizar el plan del estudiante. Error: ' + updateError.message);
       }
       
-    } catch (updateError: any) {
-      console.error('❌ Error al actualizar el estudiante:', updateError);
-      console.error('Código de error:', updateError.code);
-      console.error('Mensaje:', updateError.message);
-      alert('El pago se agregó pero no se pudo actualizar el plan del estudiante. Error: ' + updateError.message);
+      // Reset form
+      setNewPayment({
+        fullName: '',
+        amount: 0,
+        method: '',
+        date: new Date().toISOString().split('T')[0],
+        facturado: false,
+        plan: '',
+        studentId: '',
+      });
+      setIsModalOpen(false);
+      
+      // Refrescar datos
+      console.log('🔄 Refrescando datos en 2 segundos...');
+      setTimeout(async () => {
+        await fetchPayments();
+        await fetchStudents();
+        console.log('✅ Datos refrescados');
+      }, 2000);
+      
+      // ✅ NUEVO: Mensaje específico según tipo de plan
+      const planInfo = getSelectedPlanInfo();
+      const tipoMensaje = planInfo?.esDiario 
+        ? `Pago agregado. Membresía activa hasta las 23:59 de hoy.`
+        : `Pago agregado. Membresía activa por 30 días.`;
+      
+      alert(`✅ ${tipoMensaje}`);
+    } catch (error: any) {
+      console.error('❌ Error completo al agregar pago:', error);
+      console.error('Código de error:', error.code);
+      console.error('Mensaje:', error.message);
+      alert('Error al agregar el pago: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    // Reset form
-    setNewPayment({
-      fullName: '',
-      amount: 0,
-      method: '',
-      date: new Date().toISOString().split('T')[0],
-      facturado: false,
-      plan: '',
-      studentId: '',
-    });
-    setIsModalOpen(false);
-    
-    // Refrescar datos con un pequeño delay para asegurar que Firebase se actualizó
-    console.log('🔄 Refrescando datos en 2 segundos...');
-    setTimeout(async () => {
-      await fetchPayments();
-      await fetchStudents();
-      console.log('✅ Datos refrescados');
-    }, 2000);
-    
-    alert('✅ Pago agregado exitosamente');
-  } catch (error: any) {
-    console.error('❌ Error completo al agregar pago:', error);
-    console.error('Código de error:', error.code);
-    console.error('Mensaje:', error.message);
-    alert('Error al agregar el pago: ' + error.message);
-  } finally {
-    setIsSubmitting(false); // 🔓 Desbloquear para futuros envíos (SIEMPRE se ejecuta)
-  }
-};
+  };
 
   const startEditing = (payment: Payment) => {
     setEditingPayment(payment.id);
@@ -406,7 +478,6 @@ const PaymentsTable: React.FC = () => {
       console.log('ID del pago:', editingPayment);
       console.log('Datos a actualizar:', editingData);
       
-      // Preparar datos para actualizar
       const updateData: Partial<Payment> = {};
       if (editingData.fullName !== undefined) updateData.fullName = editingData.fullName;
       if (editingData.amount !== undefined) updateData.amount = editingData.amount;
@@ -417,11 +488,10 @@ const PaymentsTable: React.FC = () => {
 
       console.log('Datos limpiados para actualizar:', updateData);
 
-      // Actualizar el pago
       await updateDoc(doc(db, 'payments', editingPayment), updateData);
       console.log('✅ Pago actualizado en la base de datos');
       
-      // Si se cambió el plan, fecha o monto del estudiante, actualizar también en la colección students
+      // Si cambió plan, fecha o monto, actualizar también el estudiante
       const payment = payments.find(p => p.id === editingPayment);
       console.log('Pago original encontrado:', payment);
       
@@ -437,21 +507,23 @@ const PaymentsTable: React.FC = () => {
           console.log('Student ID:', payment.studentId);
           
           try {
-            // Calcular nuevas fechas de vigencia usando Timestamp si cambió la fecha del pago
+            // ✅ MEJORADO: Calcular nuevas fechas según el tipo de plan editado
             const fechaPago = new Date(editingData.date || payment.date);
-            const fechaDesde = Timestamp.fromDate(fechaPago);
-            const fechaHasta = Timestamp.fromDate(new Date(fechaPago.getTime() + 30 * 24 * 60 * 60 * 1000));
+            const planName = editingData.plan || payment.plan;
+            const amount = editingData.amount || payment.amount;
             
-            console.log('Nuevas fechas calculadas:');
+            const { fechaDesde, fechaHasta } = calcularFechasPlan(planName, amount, fechaPago);
+            
+            console.log('Nuevas fechas calculadas según tipo de plan:');
+            console.log('  - Plan:', planName);
+            console.log('  - Es pase diario:', isPaseDiario(planName, amount));
             console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
             console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
             
-            // Actualizar el estudiante con las nuevas fechas de vigencia como Timestamp
             const studentUpdateData: any = {
               activo: true
             };
             
-            // Solo actualizar campos que cambiaron
             if (editingData.plan !== undefined) {
               studentUpdateData.plan = editingData.plan;
               studentUpdateData['membresia.nombre'] = editingData.plan;
@@ -466,9 +538,9 @@ const PaymentsTable: React.FC = () => {
               studentUpdateData['membresia.medioPago'] = editingData.method;
             }
             
-            if (editingData.date !== undefined) {
-              studentUpdateData['membresia.fechaDesde'] = fechaDesde; // Timestamp directo
-              studentUpdateData['membresia.fechaHasta'] = fechaHasta; // Timestamp directo
+            if (editingData.date !== undefined || editingData.plan !== undefined) {
+              studentUpdateData['membresia.fechaDesde'] = fechaDesde;
+              studentUpdateData['membresia.fechaHasta'] = fechaHasta;
             }
             
             console.log('Datos de actualización del estudiante:', studentUpdateData);
@@ -481,12 +553,9 @@ const PaymentsTable: React.FC = () => {
         }
       }
       
-      // Limpiar estado de edición
       setEditingPayment(null);
       setEditingData({});
       
-      // Refrescar datos con delay
-      console.log('🔄 Refrescando datos en 2 segundos...');
       setTimeout(async () => {
         await fetchPayments();
         await fetchStudents();
@@ -521,18 +590,58 @@ const PaymentsTable: React.FC = () => {
       console.log('=== ELIMINANDO PAGO ===');
       console.log('ID del pago a eliminar:', paymentId);
       
+      const paymentToDelete = payments.find(p => p.id === paymentId);
+      if (!paymentToDelete) {
+        alert('No se encontró el pago a eliminar');
+        return;
+      }
+      
+      console.log('Pago a eliminar:', paymentToDelete);
+      
       await deleteDoc(doc(db, 'payments', paymentId));
       console.log('✅ Pago eliminado de la base de datos');
+      
+      if (paymentToDelete.studentId) {
+        console.log('=== ACTUALIZANDO MEMBRESÍA DEL ESTUDIANTE ===');
+        console.log('Student ID:', paymentToDelete.studentId);
+        
+        try {
+          const studentRef = doc(db, 'students', paymentToDelete.studentId);
+          
+          const studentDoc = await getDoc(studentRef);
+          if (studentDoc.exists()) {
+            const updateData = {
+              plan: '',
+              'membresia.nombre': '',
+              'membresia.estado': 'pendiente',
+              'membresia.montoPagado': 0,
+              'membresia.medioPago': '',
+              'membresia.fechaDesde': null,
+              'membresia.fechaHasta': null,
+              activo: false
+            };
+            
+            await updateDoc(studentRef, updateData);
+            console.log('✅ Membresía del estudiante actualizada (eliminada/pendiente)');
+          } else {
+            console.log('⚠️ El estudiante no existe en la base de datos');
+          }
+        } catch (updateError: any) {
+          console.error('❌ Error al actualizar membresía del estudiante:', updateError);
+          alert('El pago se eliminó pero no se pudo actualizar la membresía del estudiante: ' + updateError.message);
+        }
+      }
       
       setPayments(prev => prev.filter(payment => payment.id !== paymentId));
       setShowDeleteConfirm(null);
       
       setTimeout(async () => {
         await fetchPayments();
-        console.log('✅ Lista de pagos actualizada');
-      }, 500);
+        await fetchStudents();
+        console.log('✅ Datos refrescados');
+      }, 2000);
       
-      alert('✅ Pago eliminado exitosamente');
+      alert('✅ Pago eliminado exitosamente y membresía actualizada');
     } catch (error: any) {
       console.error('❌ Error al eliminar pago:', error);
       alert('Error al eliminar el pago: ' + error.message);
@@ -541,25 +650,34 @@ const PaymentsTable: React.FC = () => {
 
   const exportToExcel = () => {
     try {
-      const dataToExport = filteredPayments.map(payment => ({
-        'Estudiante': payment.fullName,
-        'Plan': payment.plan,
-        'Monto': payment.amount,
-        'Método de Pago': payment.method,
-        'Fecha': payment.date,
-        'Estado': payment.facturado ? 'Facturado' : 'Pendiente'
-      }));
+      const dataToExport = filteredPayments.map(payment => {
+        const plan = plans.find(p => p.name === payment.plan);
+        const esDiario = plan ? isPaseDiario(plan.name, plan.price) : false;
+        
+        return {
+          'Estudiante': payment.fullName,
+          'Plan': payment.plan,
+          'Tipo': esDiario ? 'Pase Diario' : 'Plan Mensual',
+          'Monto': payment.amount,
+          'Método de Pago': payment.method,
+          'Fecha': payment.date,
+          'Vigencia': esDiario ? 'Hasta 23:59 del día' : '30 días',
+          'Estado': payment.facturado ? 'Facturado' : 'Pendiente'
+        };
+      });
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(dataToExport);
 
       const colWidths = [
-        { wch: 20 },
-        { wch: 15 },
-        { wch: 10 },
-        { wch: 15 },
-        { wch: 12 },
-        { wch: 12 },
+        { wch: 20 }, // Estudiante
+        { wch: 15 }, // Plan
+        { wch: 12 }, // Tipo
+        { wch: 10 }, // Monto
+        { wch: 15 }, // Método
+        { wch: 12 }, // Fecha
+        { wch: 15 }, // Vigencia
+        { wch: 12 }, // Estado
       ];
       ws['!cols'] = colWidths;
 
@@ -587,6 +705,9 @@ const PaymentsTable: React.FC = () => {
     return matchesName && matchesPlan && matchesAmount && matchesMethod && matchesDate && matchesFacturado;
   });
 
+  // ✅ NUEVO: Obtener información del plan seleccionado para mostrar en el modal
+  const selectedPlanInfo = getSelectedPlanInfo();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -600,17 +721,10 @@ const PaymentsTable: React.FC = () => {
             <CreditCard size={24} />
             <div>
               <h2 className="text-xl font-bold">Gestión de Pagos</h2>
-              <p className="text-orange-100 text-sm">Registro de pagos de estudiantes</p>
+              <p className="text-orange-100 text-sm">Registro de pagos de estudiantes • {filteredPayments.length} pagos</p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <button 
-              onClick={exportToExcel}
-              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-            >
-              <Download size={16} />
-              <span>Exportar</span>
-            </button>
             <button 
               onClick={() => setShowFilters(!showFilters)}
               className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
@@ -732,154 +846,186 @@ const PaymentsTable: React.FC = () => {
                       <span>Fecha</span>
                     </div>
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <Clock size={14} />
+                      <span>Vigencia</span>
+                    </div>
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Estado</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayments.map(payment => (
-                  <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {editingPayment === payment.id ? (
-                        <input
-                          type="text"
-                          value={editingData.fullName || ''}
-                          onChange={(e) => setEditingData({...editingData, fullName: e.target.value})}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
-                        />
-                      ) : (
-                        payment.fullName
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {editingPayment === payment.id ? (
-                        <select
-                          value={editingData.plan || ''}
-                          onChange={(e) => {
-                            const selectedPlan = plans.find(p => p.name === e.target.value);
-                            setEditingData({
-                              ...editingData, 
-                              plan: e.target.value,
-                              amount: selectedPlan?.price || editingData.amount || 0
-                            });
-                          }}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
-                        >
-                          <option value="">Seleccionar plan</option>
-                          {plans.map(plan => (
-                            <option key={plan.id} value={plan.name}>{plan.name}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="px-2 py-1 text-xs font-medium bg-tent-orange/10 text-tent-orange rounded-full">
-                          {payment.plan}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
-                      {editingPayment === payment.id ? (
-                        <div className="relative">
-                          <span className="absolute left-2 top-1 text-gray-500 text-sm">$</span>
-                          <input
-                            type="number"
-                            value={editingData.amount || 0}
-                            onChange={(e) => setEditingData({...editingData, amount: Number(e.target.value)})}
-                            className="w-full pl-6 pr-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
-                            min="0"
-                            step="0.01"
-                          />
-                        </div>
-                      ) : (
-                        `${payment.amount.toLocaleString()}`
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {editingPayment === payment.id ? (
-                        <select
-                          value={editingData.method || ''}
-                          onChange={(e) => setEditingData({...editingData, method: e.target.value})}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
-                        >
-                          <option value="">Seleccionar método</option>
-                          {paymentMethods.map(method => (
-                            <option key={method} value={method}>{method}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        payment.method
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {editingPayment === payment.id ? (
-                        <input
-                          type="date"
-                          value={editingData.date || ''}
-                          onChange={(e) => setEditingData({...editingData, date: e.target.value})}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
-                        />
-                      ) : (
-                        payment.date
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <button
-                        onClick={() => toggleFacturado(payment.id, payment.facturado)}
-                        className="flex items-center space-x-2 hover:opacity-80 transition-opacity cursor-pointer p-1 rounded"
-                      >
-                        {payment.facturado ? (
-                          <>
-                            <CheckCircle className="text-tent-green" size={16} />
-                            <span className="text-tent-green font-medium">Facturado</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="text-red-500" size={16} />
-                            <span className="text-red-500 font-medium">Pendiente</span>
-                          </>
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex items-center space-x-2">
+                {filteredPayments.map(payment => {
+                  // ✅ NUEVO: Mostrar información del tipo de plan en cada fila
+                  const plan = plans.find(p => p.name === payment.plan);
+                  const esDiario = plan ? isPaseDiario(plan.name, plan.price) : false;
+                  
+                  return (
+                    <tr key={payment.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {editingPayment === payment.id ? (
-                          <>
-                            <button
-                              onClick={saveEditing}
-                              className="text-tent-green hover:text-tent-green/80 transition-colors p-1 rounded"
-                            >
-                              <Save size={16} />
-                            </button>
-                            <button
-                              onClick={cancelEditing}
-                              className="text-red-500 hover:text-red-500/80 transition-colors p-1 rounded"
-                            >
-                              <X size={16} />
-                            </button>
-                          </>
+                          <input
+                            type="text"
+                            value={editingData.fullName || ''}
+                            onChange={(e) => setEditingData({...editingData, fullName: e.target.value})}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
+                          />
                         ) : (
-                          <>
-                            <button
-                              onClick={() => startEditing(payment)}
-                              className="text-tent-orange hover:text-tent-orange/80 transition-colors p-1 rounded"
-                              title="Editar pago"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                             {isSuperAdmin && (
-                            <button
-                              onClick={() => setShowDeleteConfirm(payment.id)}
-                              className="text-red-500 hover:text-red-600 transition-colors p-1 rounded"
-                              title="Eliminar pago (Solo Super-Admin)"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                            )}
-                          </>
+                          payment.fullName
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingPayment === payment.id ? (
+                          <select
+                            value={editingData.plan || ''}
+                            onChange={(e) => {
+                              const selectedPlan = plans.find(p => p.name === e.target.value);
+                              setEditingData({
+                                ...editingData, 
+                                plan: e.target.value,
+                                amount: selectedPlan?.price || editingData.amount || 0
+                              });
+                            }}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
+                          >
+                            <option value="">Seleccionar plan</option>
+                            {plans.map(plan => (
+                              <option key={plan.id} value={plan.name}>{plan.name}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <span className="px-2 py-1 text-xs font-medium bg-tent-orange/10 text-tent-orange rounded-full">
+                              {payment.plan}
+                            </span>
+                            {/* ✅ NUEVO: Badge de tipo de plan */}
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              esDiario
+                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                : 'bg-blue-100 text-blue-800 border border-blue-300'
+                            }`}>
+                              {esDiario ? '☀️' : '📅'}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                        {editingPayment === payment.id ? (
+                          <div className="relative">
+                            <span className="absolute left-2 top-1 text-gray-500 text-sm">$</span>
+                            <input
+                              type="number"
+                              value={editingData.amount || 0}
+                              onChange={(e) => setEditingData({...editingData, amount: Number(e.target.value)})}
+                              className="w-full pl-6 pr-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
+                        ) : (
+                          `${payment.amount.toLocaleString()}`
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingPayment === payment.id ? (
+                          <select
+                            value={editingData.method || ''}
+                            onChange={(e) => setEditingData({...editingData, method: e.target.value})}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
+                          >
+                            <option value="">Seleccionar método</option>
+                            {paymentMethods.map(method => (
+                              <option key={method} value={method}>{method}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          payment.method
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingPayment === payment.id ? (
+                          <input
+                            type="date"
+                            value={editingData.date || ''}
+                            onChange={(e) => setEditingData({...editingData, date: e.target.value})}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
+                          />
+                        ) : (
+                          payment.date
+                        )}
+                      </td>
+                      {/* ✅ NUEVA: Columna de vigencia */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          esDiario
+                            ? 'bg-yellow-50 text-yellow-700'
+                            : 'bg-blue-50 text-blue-700'
+                        }`}>
+                          {esDiario ? 'Hasta 23:59' : '30 días'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <button
+                          onClick={() => toggleFacturado(payment.id, payment.facturado)}
+                          className="flex items-center space-x-2 hover:opacity-80 transition-opacity cursor-pointer p-1 rounded"
+                        >
+                          {payment.facturado ? (
+                            <>
+                              <CheckCircle className="text-tent-green" size={16} />
+                              <span className="text-tent-green font-medium">Facturado</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="text-red-500" size={16} />
+                              <span className="text-red-500 font-medium">Pendiente</span>
+                            </>
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex items-center space-x-2">
+                          {editingPayment === payment.id ? (
+                            <>
+                              <button
+                                onClick={saveEditing}
+                                className="text-tent-green hover:text-tent-green/80 transition-colors p-1 rounded"
+                              >
+                                <Save size={16} />
+                              </button>
+                              <button
+                                onClick={cancelEditing}
+                                className="text-red-500 hover:text-red-500/80 transition-colors p-1 rounded"
+                              >
+                                <X size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => startEditing(payment)}
+                                className="text-tent-orange hover:text-tent-orange/80 transition-colors p-1 rounded"
+                                title="Editar pago"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                               {isSuperAdmin && (
+                              <button
+                                onClick={() => setShowDeleteConfirm(payment.id)}
+                                className="text-red-500 hover:text-red-600 transition-colors p-1 rounded"
+                                title="Eliminar pago (Solo Super-Admin)"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -899,7 +1045,7 @@ const PaymentsTable: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-xl p-6 w-full max-w-md mx-4"
+              className="bg-white rounded-xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Agregar Nuevo Pago</h3>
@@ -955,13 +1101,45 @@ const PaymentsTable: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tent-orange focus:border-transparent"
                   >
                     <option value="">Seleccionar plan</option>
-                    {plans.map(plan => (
-                      <option key={plan.id} value={plan.name}>
-                        {plan.name} - ${plan.price.toLocaleString()}
-                      </option>
-                    ))}
+                    {plans.map(plan => {
+                      const esDiario = isPaseDiario(plan.name, plan.price);
+                      return (
+                        <option key={plan.id} value={plan.name}>
+                          {plan.name} - ${plan.price.toLocaleString()} {esDiario ? '(Diario)' : '(Mensual)'}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
+
+                {/* ✅ NUEVO: Información del plan seleccionado */}
+                {selectedPlanInfo && (
+                  <div className={`p-3 rounded-lg border ${
+                    selectedPlanInfo.esDiario
+                      ? 'bg-yellow-50 border-yellow-200'
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <div className="flex items-start space-x-2">
+                      {selectedPlanInfo.esDiario ? (
+                        <Sun size={16} className="text-yellow-600 mt-0.5" />
+                      ) : (
+                        <CalendarDays size={16} className="text-blue-600 mt-0.5" />
+                      )}
+                      <div className="text-sm">
+                        <p className={`font-medium ${
+                          selectedPlanInfo.esDiario ? 'text-yellow-800' : 'text-blue-800'
+                        }`}>
+                          {selectedPlanInfo.esDiario ? 'Pase Diario' : 'Plan Mensual'}
+                        </p>
+                        <p className={`${
+                          selectedPlanInfo.esDiario ? 'text-yellow-700' : 'text-blue-700'
+                        }`}>
+                          Vigencia: {selectedPlanInfo.vigencia}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Monto */}
                 <div>
@@ -1015,7 +1193,10 @@ const PaymentsTable: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tent-orange focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Esta fecha será el inicio de la vigencia del plan (1 mes desde esta fecha)
+                    {selectedPlanInfo?.esDiario 
+                      ? 'Para pases diarios: vigencia hasta las 23:59 de esta fecha'
+                      : 'Esta fecha será el inicio de la vigencia del plan (30 días desde esta fecha)'
+                    }
                   </p>
                 </div>
 
@@ -1108,7 +1289,7 @@ const PaymentsTable: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-sm text-red-700 mt-2">
-                  Se eliminará permanentemente el registro del pago y no podrá recuperarse.
+                  Se eliminará permanentemente el registro del pago y la membresía del estudiante será actualizada.
                 </p>
               </div>
 

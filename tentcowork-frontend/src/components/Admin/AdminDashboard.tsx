@@ -81,6 +81,9 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Definir todos los medios de pago disponibles
+  const paymentMethods = ['Efectivo', 'Mercado Pago Transferencia', 'Mercado Pago Posnet', 'Mercado Pago Hospedado'];
+
   useEffect(() => {
     fetchMetrics();
   }, []);
@@ -142,22 +145,22 @@ const AdminDashboard: React.FC = () => {
       else if (estado === 'pendiente') pendientes++;
       else noPagados++;
 
-      // Tipos de estudiante (tipoAlumno) - corregir lectura del campo
-      const tipoAlumno = student.tipoAlumno || student.tipo_alumno || student['Tipo Alumno'] || student.role;
+      // Tipos de estudiante (certificado) - corregir lectura del campo
+      const certificado = student.certificado;
       console.log('=== DEBUG TIPO ALUMNO ===');
       console.log('Estudiante:', student.fullName || student.name);
-      console.log('tipoAlumno:', tipoAlumno);
+      console.log('certificado:', certificado);
       console.log('Objeto completo:', student);
       
-      if (tipoAlumno === 'Alumno Regular') {
+      if (certificado == true ) {
         alumnosRegulares++;
         presentados++; // Los alumnos regulares son "presentados" (certificados)
         console.log('✅ Contado como Alumno Regular');
-      } else if (tipoAlumno === 'No Certificado') {
+      } else if (certificado == null || false ) {
         noPresentados++; // Los no certificados son "no presentados"
         console.log('✅ Contado como No Certificado');
       } else {
-        console.log('❓ Tipo no reconocido:', tipoAlumno);
+        console.log('❓ Tipo no reconocido:', certificado);
       }
 
       // Distribución de planes
@@ -210,7 +213,12 @@ const AdminDashboard: React.FC = () => {
     
     let hoyTotal = 0;
     let pendientes = 0;
+    
+    // Inicializar todos los medios de pago con 0
     const mediosPago: { [medio: string]: number } = {};
+    paymentMethods.forEach(method => {
+      mediosPago[method] = 0;
+    });
 
     payments.forEach(payment => {
       // Pagos de hoy
@@ -228,9 +236,27 @@ const AdminDashboard: React.FC = () => {
         pendientes++;
       }
 
-      // Medios de pago
+      // Medios de pago - normalizar y contar
       const medio = payment.medioPago || payment.medoPago || 'Efectivo';
-      mediosPago[medio] = (mediosPago[medio] || 0) + 1;
+      
+      console.log('=== DEBUG MEDIO DE PAGO ===');
+      console.log('Pago objeto:', payment);
+      console.log('Medio detectado:', medio);
+      console.log('Medios disponibles:', Object.keys(mediosPago));
+      
+      // Si el medio de pago existe en nuestros métodos definidos, incrementar
+      if (mediosPago.hasOwnProperty(medio)) {
+        mediosPago[medio]++;
+        console.log('✅ Medio encontrado y contado:', medio);
+      } else {
+        // Si no existe, agregarlo como método no reconocido
+        console.log('❌ Medio no reconocido:', medio);
+        // Crear una entrada para "Otros" si no existe
+        if (!mediosPago['Otros']) {
+          mediosPago['Otros'] = 0;
+        }
+        mediosPago['Otros']++;
+      }
     });
 
     return {
@@ -310,6 +336,14 @@ const AdminDashboard: React.FC = () => {
         <span className="font-semibold">{value}</span>
       </div>
     );
+
+  // Función helper para obtener el ícono correcto según el medio de pago
+  const getPaymentMethodIcon = (medio: string) => {
+    if (medio === 'Efectivo') {
+      return <Banknote size={14} />;
+    }
+    return <CreditCard size={14} />;
+  };
 
   if (loading) {
     return (
@@ -427,7 +461,7 @@ const AdminDashboard: React.FC = () => {
                   key={medio} 
                   label={medio} 
                   value={count}
-                  icon={medio === 'Efectivo' ? <Banknote size={14} /> : <CreditCard size={14} />}
+                  icon={getPaymentMethodIcon(medio)}
                 />
               ))}
             </div>

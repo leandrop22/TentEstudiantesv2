@@ -12,11 +12,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@types/node-fetch": "^2.6.4",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "firebase-admin": "^13.4.0",
-    "mercadopago": "^2.0.15"
+    "mercadopago": "^2.0.15",
+    "node-fetch": "^2.6.7"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

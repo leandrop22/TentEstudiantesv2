@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Plus, Edit2, Trash2, Clock, DollarSign, ChevronDown, ChevronUp, Eye, EyeOff, AlertTriangle, X } from 'lucide-react';
+import { Calendar, Plus, Edit2, Trash2, Clock, DollarSign, ChevronDown, ChevronUp, Eye, EyeOff, AlertTriangle, X, Sun, CalendarDays, Info } from 'lucide-react';
 import { Plan } from '../../types/Plan';
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
   onSubmit: () => void;
   onDelete: (id: string) => void;
   onEdit: (id: string, data: Plan) => void;
-  onCheckStudentsUsingPlan?: (planId: string) => Promise<number>; // Nueva prop para verificar estudiantes
+  onCheckStudentsUsingPlan?: (planId: string) => Promise<number>;
 }
 
 const PlansEditor: React.FC<Props> = ({ 
@@ -33,6 +33,51 @@ const PlansEditor: React.FC<Props> = ({
     studentsCount: number;
   }>({ show: false, planId: '', planName: '', studentsCount: 0 });
 
+  // ✅ NUEVA FUNCIÓN: Detectar si es pase diario por nombre y precio
+  const isPaseDiario = (planName: string, price: number = 0) => {
+    const nombre = planName.toLowerCase();
+    return nombre.includes('diario') || 
+           nombre.includes('día') || 
+           nombre.includes('day') ||
+           (nombre.includes('pase') && (nombre.includes('diario') || nombre.includes('día'))) ||
+           price <= 8000; // Criterio adicional por precio
+  };
+
+  // ✅ NUEVA FUNCIÓN: Obtener tipo de plan para mostrar
+  const getTipoPlan = (plan: Plan) => {
+    return isPaseDiario(plan.name, plan.price) ? 'diario' : 'mensual';
+  };
+
+  // ✅ NUEVA FUNCIÓN: Validar configuración del plan
+  const validatePlanConfig = (plan: Plan) => {
+    const errors: string[] = [];
+    
+    if (isPaseDiario(plan.name, plan.price)) {
+      // Validaciones específicas para pase diario
+      if (plan.price > 10000) {
+        errors.push('Los pases diarios suelen tener un precio menor a $10,000');
+      }
+    } else {
+      // Validaciones para planes mensuales
+      if (plan.price < 5000) {
+        errors.push('Los planes mensuales suelen tener un precio mayor a $5,000');
+      }
+      if (!plan.days || plan.days.trim() === '') {
+        errors.push('Los planes mensuales deben especificar días de la semana');
+      }
+    }
+    
+    if (!plan.name || plan.name.trim() === '') {
+      errors.push('El nombre del plan es obligatorio');
+    }
+    
+    if (!plan.price || plan.price <= 0) {
+      errors.push('El precio debe ser mayor a 0');
+    }
+    
+    return errors;
+  };
+
   const togglePlanExpansion = (planId: string) => {
     const newExpanded = new Set(expandedPlans);
     if (newExpanded.has(planId)) {
@@ -45,7 +90,7 @@ const PlansEditor: React.FC<Props> = ({
 
   const handleEdit = (id: string, data: Plan) => {
     onEdit(id, data);
-    setShowForm(true); // Abrir automáticamente el formulario
+    setShowForm(true);
   };
 
   const handleDeleteClick = async (planId: string, planName: string) => {
@@ -79,7 +124,7 @@ const PlansEditor: React.FC<Props> = ({
   };
 
   const formatDays = (days: string) => {
-    if (!days) return '';
+    if (!days) return 'No especificado';
     const dayMap: { [key: string]: string } = {
       'Lunes': 'L', 'Martes': 'M', 'Miércoles': 'X', 'Jueves': 'J', 
       'Viernes': 'V', 'Sábado': 'S', 'Domingo': 'D'
@@ -90,6 +135,17 @@ const PlansEditor: React.FC<Props> = ({
   const truncateText = (text: string, maxLength: number) => {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
+
+  // ✅ NUEVO: Obtener estadísticas de planes
+  const planStats = {
+    total: plans.length,
+    diarios: plans.filter(p => isPaseDiario(p.name, p.price)).length,
+    mensuales: plans.filter(p => !isPaseDiario(p.name, p.price)).length
+  };
+
+  // ✅ NUEVO: Validar formulario actual
+  const currentFormErrors = validatePlanConfig(formData);
+  const isCurrentFormDiario = isPaseDiario(formData.name, formData.price);
 
   return (
     <motion.div
@@ -106,7 +162,9 @@ const PlansEditor: React.FC<Props> = ({
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">Planes</h2>
-              <p className="text-orange-100 text-sm">Gestión de planes de entrenamiento</p>
+              <p className="text-orange-100 text-sm">
+                Gestión de planes de entrenamiento • {planStats.total} planes ({planStats.diarios} diarios, {planStats.mensuales} mensuales)
+              </p>
             </div>
           </div>
           <motion.button
@@ -132,16 +190,71 @@ const PlansEditor: React.FC<Props> = ({
             className="bg-gradient-to-br from-green-50 to-orange-50 border-b border-gray-200 overflow-hidden"
           >
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                <div className="w-1 h-6 bg-green-500 rounded-full mr-3"></div>
-                {editingId ? 'Editar Plan' : 'Agregar Nuevo Plan'}
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                  <div className="w-1 h-6 bg-green-500 rounded-full mr-3"></div>
+                  {editingId ? 'Editar Plan' : 'Agregar Nuevo Plan'}
+                </h3>
+                
+                {/* ✅ NUEVO: Indicador de tipo de plan */}
+                {formData.name && (
+                  <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
+                    isCurrentFormDiario
+                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                      : 'bg-blue-100 text-blue-800 border border-blue-300'
+                  }`}>
+                    {isCurrentFormDiario ? <Sun size={16} /> : <CalendarDays size={16} />}
+                    <span>Plan {isCurrentFormDiario ? 'Diario' : 'Mensual'}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ✅ NUEVO: Información del tipo de plan detectado */}
+              {formData.name && (
+                <div className={`mb-4 p-3 rounded-lg border ${
+                  isCurrentFormDiario
+                    ? 'bg-yellow-50 border-yellow-200'
+                    : 'bg-blue-50 border-blue-200'
+                }`}>
+                  <div className="flex items-start space-x-2">
+                    <Info size={16} className={`mt-0.5 ${isCurrentFormDiario ? 'text-yellow-600' : 'text-blue-600'}`} />
+                    <div className="text-sm">
+                      <p className={`font-medium ${isCurrentFormDiario ? 'text-yellow-800' : 'text-blue-800'}`}>
+                        {isCurrentFormDiario ? 'Pase Diario Detectado' : 'Plan Mensual Detectado'}
+                      </p>
+                      <p className={`${isCurrentFormDiario ? 'text-yellow-700' : 'text-blue-700'}`}>
+                        {isCurrentFormDiario 
+                          ? 'Vigencia: hasta las 23:59:59 del día de contratación'
+                          : 'Vigencia: 30 días desde la fecha de pago'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ NUEVO: Mostrar errores de validación */}
+              {currentFormErrors.length > 0 && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <AlertTriangle size={16} className="text-red-600 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-red-800 mb-1">Advertencias de configuración:</p>
+                      <ul className="text-red-700 space-y-1">
+                        {currentFormErrors.map((error, index) => (
+                          <li key={index} className="text-xs">• {error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Nombre del plan"
+                    placeholder="Nombre del plan (ej: Pase Diario, Plan Mensual)"
                     value={formData.name}
                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-tent-orange focus:border-transparent bg-white/80 backdrop-blur-sm"
@@ -184,7 +297,7 @@ const PlansEditor: React.FC<Props> = ({
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Días de la semana
+                    Días de la semana {isCurrentFormDiario && <span className="text-yellow-600">(Opcional para pases diarios)</span>}
                   </label>
                   <div className="grid grid-cols-7 gap-1">
                     {[
@@ -268,94 +381,110 @@ const PlansEditor: React.FC<Props> = ({
             </h3>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {plans.map(plan => (
-                <motion.div
-                  key={plan.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 hover:border-orange-300 transition-all duration-200 hover:shadow-md overflow-hidden"
-                >
-                  {/* Header de la tarjeta */}
-                  <div className="p-4 border-b border-gray-100">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 text-lg truncate">
-                          {plan.name}
-                        </h4>
-                        <div className="flex items-center space-x-4 mt-2">
-                          <span className="text-2xl font-bold text-green-600">
-                            ${plan.price}
-                          </span>
-                          <span className={`text-sm px-2 py-1 rounded-full ${
-                            formatDays(plan.days) === 'Ninguno' 
-                              ? 'text-gray-400 bg-gray-100' 
-                              : 'text-gray-500 bg-gray-100'
-                          }`}>
-                            {formatDays(plan.days)}
-                          </span>
+              {plans.map(plan => {
+                const tipoPlan = getTipoPlan(plan);
+                return (
+                  <motion.div
+                    key={plan.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 hover:border-orange-300 transition-all duration-200 hover:shadow-md overflow-hidden"
+                  >
+                    {/* Header de la tarjeta */}
+                    <div className="p-4 border-b border-gray-100">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <h4 className="font-semibold text-gray-900 text-lg truncate">
+                              {plan.name}
+                            </h4>
+                            {/* ✅ NUEVO: Badge de tipo de plan */}
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              tipoPlan === 'diario'
+                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                : 'bg-blue-100 text-blue-800 border border-blue-300'
+                            }`}>
+                              {tipoPlan === 'diario' ? '📅 Diario' : '🗓️ Mensual'}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-4 mt-2">
+                            <span className="text-2xl font-bold text-green-600">
+                              ${plan.price}
+                            </span>
+                            <span className="text-sm px-2 py-1 rounded-full text-gray-500 bg-gray-100">
+                              {formatDays(plan.days)}
+                            </span>
+                          </div>
+                          {/* ✅ NUEVO: Info de vigencia */}
+                          <p className="text-xs text-gray-500 mt-2">
+                            {tipoPlan === 'diario' 
+                              ? 'Vigencia: Hasta las 23:59 del día' 
+                              : 'Vigencia: 30 días desde el pago'
+                            }
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-1 ml-2">
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => handleEdit(plan.id, plan)}
+                            className="text-tent-orange hover:text-tent-orange p-2 rounded-lg hover:bg-orange-50 transition-colors"
+                            title="Editar plan"
+                          >
+                            <Edit2 size={16} />
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => handleDeleteClick(plan.id, plan.name)}
+                            className="text-red-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                            title="Eliminar plan"
+                          >
+                            <Trash2 size={16} />
+                          </motion.button>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-1 ml-2">
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => handleEdit(plan.id, plan)}
-                          className="text-tent-orange hover:text-tent-orange p-2 rounded-lg hover:bg-orange-50 transition-colors"
-                          title="Editar plan"
-                        >
-                          <Edit2 size={16} />
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => handleDeleteClick(plan.id, plan.name)}
-                          className="text-red-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                          title="Eliminar plan"
-                        >
-                          <Trash2 size={16} />
-                        </motion.button>
+                    </div>
+
+                    {/* Contenido de la tarjeta */}
+                    <div className="p-4">
+                      <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                        <span className="flex items-center">
+                          <Clock size={14} className="mr-1" />
+                          {plan.startHour} - {plan.endHour}
+                        </span>
+                      </div>
+                      
+                      <div className="text-sm text-gray-700 leading-relaxed">
+                        {expandedPlans.has(plan.id) ? (
+                          <p>{plan.description}</p>
+                        ) : (
+                          <p>{truncateText(plan.description, 80)}</p>
+                        )}
+                        
+                        {plan.description && plan.description.length > 80 && (
+                          <button
+                            onClick={() => togglePlanExpansion(plan.id)}
+                            className="text-orange-500 hover:text-orange-600 text-xs font-medium mt-2 flex items-center"
+                          >
+                            {expandedPlans.has(plan.id) ? (
+                              <>
+                                <ChevronUp size={14} className="mr-1" />
+                                Ver menos
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown size={14} className="mr-1" />
+                                Ver más
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Contenido de la tarjeta */}
-                  <div className="p-4">
-                    <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-                      <span className="flex items-center">
-                        <Clock size={14} className="mr-1" />
-                        {plan.startHour} - {plan.endHour}
-                      </span>
-                    </div>
-                    
-                    <div className="text-sm text-gray-700 leading-relaxed">
-                      {expandedPlans.has(plan.id) ? (
-                        <p>{plan.description}</p>
-                      ) : (
-                        <p>{truncateText(plan.description, 80)}</p>
-                      )}
-                      
-                      {plan.description && plan.description.length > 80 && (
-                        <button
-                          onClick={() => togglePlanExpansion(plan.id)}
-                          className="text-orange-500 hover:text-orange-600 text-xs font-medium mt-2 flex items-center"
-                        >
-                          {expandedPlans.has(plan.id) ? (
-                            <>
-                              <ChevronUp size={14} className="mr-1" />
-                              Ver menos
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown size={14} className="mr-1" />
-                              Ver más
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
         )}

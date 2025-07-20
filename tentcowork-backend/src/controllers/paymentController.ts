@@ -12,21 +12,62 @@ import {
 // 🔧 IMPORTAR MERCADO PAGO VERSIÓN NUEVA
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 
-// 🔧 CONFIGURAR MERCADO PAGO (NUEVA SINTAXIS)
-let client: MercadoPagoConfig;
-let preference: Preference;
-let payment: Payment;
+// 🔧 CONFIGURAR MERCADO PAGO (NUEVA SINTAXIS) - CORREGIDA
+let client: MercadoPagoConfig | null = null;
+let preference: Preference | null = null; 
+let payment: Payment | null = null;
 
-// Inicializar solo si hay access token
-if (process.env.MP_ACCESS_TOKEN) {
-  client = new MercadoPagoConfig({ 
-    accessToken: process.env.MP_ACCESS_TOKEN 
-  });
-  preference = new Preference(client);
-  payment = new Payment(client);
-  console.log('✅ Mercado Pago configurado correctamente');
-} else {
-  console.log('⚠️ MP_ACCESS_TOKEN no configurado - Mercado Pago no disponible');
+// 🔧 INICIALIZACIÓN CORREGIDA
+export function initializeMercadoPago() {
+  console.log('🔧 Inicializando Mercado Pago...');
+  
+  const token = process.env.MP_ACCESS_TOKEN;
+  console.log('Token presente:', !!token);
+  
+  if (!token) {
+    console.log('❌ MP_ACCESS_TOKEN no encontrado');
+    return false;
+  }
+
+  if (!token.startsWith('APP_USR-')) {
+    console.log('❌ Token formato incorrecto');
+    return false;
+  }
+
+  try {
+    // 🔧 USAR EXACTAMENTE LA MISMA CONFIGURACIÓN QUE FUNCIONA EN EL TEST
+    client = new MercadoPagoConfig({ 
+      accessToken: token.trim()
+    });
+    
+    preference = new Preference(client);
+    payment = new Payment(client);
+    
+    console.log('✅ Mercado Pago inicializado correctamente');
+    console.log('  - Cliente:', !!client);
+    console.log('  - Preference:', !!preference);
+    console.log('  - Payment:', !!payment);
+    
+    return true;
+    
+  } catch (error: any) {
+    console.error('❌ Error inicializando MP:', error.message);
+    client = null;
+    preference = null;
+    payment = null;
+    return false;
+  }
+}
+
+// 🔧 INICIALIZAR AL CARGAR EL MÓDULO
+let mpInitialized = initializeMercadoPago();
+
+// Función para inicializar bajo demanda
+function ensureMPInitialized(): boolean {
+  if (!mpInitialized) {
+    mpInitialized = initializeMercadoPago();
+  }
+  return mpInitialized;
 }
 
 export class PaymentController {
@@ -108,9 +149,13 @@ export class PaymentController {
     try {
       console.log('=== CREANDO PREFERENCIA MERCADO PAGO ===');
       
-      // Verificar que MP esté configurado
-      if (!preference) {
-        res.status(500).json({ error: 'Mercado Pago not configured' } as any);
+      // 🔧 VERIFICAR QUE MP ESTÉ INICIALIZADO
+      if (!ensureMPInitialized() || !client || !preference) {
+        console.log('❌ Mercado Pago no está inicializado');
+        res.status(500).json({ 
+          error: 'Mercado Pago client not initialized',
+          details: 'Check MP_ACCESS_TOKEN configuration'
+        } as any);
         return;
       }
 
@@ -137,7 +182,11 @@ export class PaymentController {
         studentEmail: studentEmail || 'no-email'
       });
 
-      // 🔧 CREAR LA PREFERENCIA CON NUEVA SINTAXIS
+      // ✅ VERIFICAR URLs CON FALLBACKS
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+
+      // 🔧 CREAR LA PREFERENCIA CON CONFIGURACIÓN QUE FUNCIONA
       const preferenceData = {
         items: [{
           id: `plan-${studentId}-${Date.now()}`,
@@ -148,25 +197,16 @@ export class PaymentController {
           currency_id: 'ARS',
         }],
         payer: {
-          name: fullName,
           email: studentEmail || `${studentId}@tent-default.com`,
         },
         back_urls: {
-          success: `${process.env.FRONTEND_URL}/payment/success`,
-          failure: `${process.env.FRONTEND_URL}/payment/failure`,
-          pending: `${process.env.FRONTEND_URL}/payment/pending`,
+          success: `${frontendUrl}/payment/success`,
+          failure: `${frontendUrl}/payment/failure`, 
+          pending: `${frontendUrl}/payment/pending`,
         },
-        auto_return: 'approved',
-        notification_url: `${process.env.BACKEND_URL}/api/webhook/mercadopago`,
+        notification_url: `${backendUrl}/api/webhook/mercadopago`,
         external_reference: studentId,
-        metadata: {
-          student_id: studentId,
-          plan_name: plan,
-          payment_method: 'Mercado Pago Hospedado'
-        },
-        expires: true,
-        expiration_date_from: new Date().toISOString(),
-        expiration_date_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 horas
+        statement_descriptor: 'TENTCOWORK',
       };
 
       console.log('Preference data:', JSON.stringify(preferenceData, null, 2));
@@ -187,7 +227,7 @@ export class PaymentController {
       const responseData: MercadoPagoPreferenceResponse = {
         id: response.id!,
         init_point: response.init_point!,
-        sandbox_init_point: response.sandbox_init_point!,
+        sandbox_init_point: response.sandbox_init_point || response.init_point!,
       };
 
       res.json(responseData);
@@ -202,6 +242,71 @@ export class PaymentController {
   }
 
   /**
+   * 🎯 CREAR PAGO PENDIENTE PARA RECEPCIÓN
+   * Endpoint llamado desde el frontend para registrar un pago pendiente
+   */
+  static async createPendingPayment(req: Request, res: Response): Promise<void> {
+    try {
+      console.log('=== CREANDO PAGO PENDIENTE PARA RECEPCIÓN ===');
+      
+      const { paymentData } = req.body;
+      
+      // Validar datos requeridos
+      if (!paymentData) {
+        res.status(400).json({ error: 'Payment data is required' });
+        return;
+      }
+
+      const { fullName, amount, plan, studentId, studentEmail } = paymentData;
+      
+      if (!fullName || !amount || !plan || !studentId) {
+        res.status(400).json({ error: 'Missing required payment data' });
+        return;
+      }
+
+      console.log('Payment data received:', {
+        fullName,
+        amount,
+        plan,
+        studentId,
+        method: 'Pago en Recepción'
+      });
+
+      // Crear registro de pago pendiente en Firebase
+      const paymentRecord = {
+        studentId,
+        fullName,
+        amount,
+        plan,
+        method: 'Pago en Recepción',
+        facturado: false, // Pendiente hasta que se confirme en recepción
+        date: admin.firestore.FieldValue.serverTimestamp(),
+        status: 'pending',
+        studentEmail: studentEmail || `${studentId}@cowork.com`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      // Guardar en la colección 'payments'
+      const docRef = await db.collection('payments').add(paymentRecord);
+      
+      console.log('✅ Pago pendiente creado exitosamente:', docRef.id);
+      
+      res.json({
+        success: true,
+        message: 'Pago pendiente registrado para recepción',
+        paymentId: docRef.id
+      });
+      
+    } catch (error: any) {
+      console.error('❌ Error creating pending payment:', error);
+      res.status(500).json({ 
+        error: 'Error creating pending payment',
+        details: error.message 
+      });
+    }
+  }
+
+  /**
    * Test endpoint para verificar configuración
    */
   static async testConfiguration(req: Request, res: Response): Promise<void> {
@@ -212,6 +317,9 @@ export class PaymentController {
       console.log('=== VERIFICANDO CONFIGURACIÓN MP ===');
       console.log('Has Access Token:', hasAccessToken);
       console.log('Has Public Key:', hasPublicKey);
+      console.log('MP Initialized:', mpInitialized);
+      console.log('Client exists:', !!client);
+      console.log('Preference exists:', !!preference);
       
       if (!hasAccessToken) {
         res.status(500).json({ 
@@ -221,10 +329,14 @@ export class PaymentController {
         return;
       }
 
-      if (!client || !preference || !payment) {
+      if (!ensureMPInitialized() || !client || !preference || !payment) {
         res.status(500).json({ 
           error: 'Mercado Pago client not initialized',
-          details: 'Check MP_ACCESS_TOKEN configuration'
+          details: 'Check MP_ACCESS_TOKEN configuration',
+          hasAccessToken,
+          mpInitialized,
+          clientExists: !!client,
+          preferenceExists: !!preference
         });
         return;
       }
@@ -238,7 +350,8 @@ export class PaymentController {
         backendUrl: process.env.BACKEND_URL,
         frontendUrl: process.env.FRONTEND_URL,
         webhookUrl: `${process.env.BACKEND_URL}/api/webhook/mercadopago`,
-        clientInitialized: !!client
+        clientInitialized: !!client,
+        mpInitialized: ensureMPInitialized()
       });
       
     } catch (error: any) {

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { db, auth } from '../../utils/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, Timestamp, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,14 +26,14 @@ interface Plan {
 }
 
 interface Estudiante {
-  id: string;
+  uid: string;
   fullName: string;
   email: string;
   phone: string;
   university: string;
   carrera: string;
   accessCode: string;
-  fotoURL?: string;
+  fotoURL?: string | null;
   plan?: string;
   membresia?: {
     nombre: string;
@@ -58,7 +58,48 @@ export default function ProfileInfo() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Función para verificar validez usando fechaDesde y fechaHasta como Timestamp
+  // ✅ NUEVA FUNCIÓN: Detectar si es pase diario
+  const isPaseDiario = (planName: string) => {
+    const nombre = planName.toLowerCase();
+    return nombre.includes('diario') || 
+           nombre.includes('día') || 
+           nombre.includes('day') ||
+           nombre.includes('pase') && (nombre.includes('diario') || nombre.includes('día'));
+  };
+
+  // ✅ NUEVA FUNCIÓN: Calcular fechas según tipo de plan
+  const calcularFechasPlan = (plan: Plan) => {
+    const ahora = new Date();
+    let fechaDesde: Date;
+    let fechaHasta: Date;
+
+    if (isPaseDiario(plan.name)) {
+      // Para pase diario: desde ahora hasta las 23:59:59 del mismo día
+      fechaDesde = new Date(ahora);
+      fechaHasta = new Date(ahora);
+      fechaHasta.setHours(23, 59, 59, 999); // Hasta las 23:59:59.999
+      
+      console.log(`📅 Pase Diario: ${plan.name}`);
+      console.log(`⏰ Desde: ${fechaDesde.toLocaleString()}`);
+      console.log(`⏰ Hasta: ${fechaHasta.toLocaleString()}`);
+    } else {
+      // Para planes mensuales: desde ahora hasta dentro de 30 días
+      fechaDesde = new Date(ahora);
+      fechaHasta = new Date(ahora);
+      fechaHasta.setDate(fechaHasta.getDate() + 30); // 30 días
+      
+      console.log(`📅 Plan Mensual: ${plan.name}`);
+      console.log(`⏰ Desde: ${fechaDesde.toLocaleString()}`);
+      console.log(`⏰ Hasta: ${fechaHasta.toLocaleString()}`);
+    }
+
+    return {
+      fechaDesde: Timestamp.fromDate(fechaDesde),
+      fechaHasta: Timestamp.fromDate(fechaHasta)
+    };
+  };
+
+  // Funciones existentes (sin cambios)
   const verificarValidez = (fechaDesde?: Timestamp, fechaHasta?: Timestamp) => {
     if (!fechaDesde || !fechaHasta) return false;
     
@@ -69,7 +110,6 @@ export default function ProfileInfo() {
     return hoy >= desde && hoy <= hasta;
   };
 
-  // Función para obtener días restantes usando fechaHasta como Timestamp
   const getDiasRestantes = (fechaHasta?: Timestamp) => {
     if (!fechaHasta) return 0;
     
@@ -79,11 +119,19 @@ export default function ProfileInfo() {
     return Math.ceil(diferencia / (1000 * 3600 * 24));
   };
 
-  // Función para obtener el estado real de la membresía
+  // ✅ MEJORADA: Función para obtener horas restantes (útil para pase diario)
+  const getHorasRestantes = (fechaHasta?: Timestamp) => {
+    if (!fechaHasta) return 0;
+    
+    const hoy = new Date();
+    const hasta = fechaHasta.toDate();
+    const diferencia = hasta.getTime() - hoy.getTime();
+    return Math.ceil(diferencia / (1000 * 3600)); // Horas
+  };
+
   const getEstadoReal = (membresia: any) => {
     if (!membresia) return 'sin_plan';
     
-    // Verificar si hay fechas de vigencia
     if (membresia.fechaDesde && membresia.fechaHasta) {
       const esValido = verificarValidez(membresia.fechaDesde, membresia.fechaHasta);
       if (!esValido) {
@@ -91,13 +139,19 @@ export default function ProfileInfo() {
         return diasRestantes < 0 ? 'vencido' : 'por_vencer';
       }
       
-      const diasRestantes = getDiasRestantes(membresia.fechaHasta);
-      if (diasRestantes <= 7 && diasRestantes > 0) return 'por_vencer';
+      // Para pases diarios, verificar si está por vencer en las próximas horas
+      if (isPaseDiario(membresia.nombre)) {
+        const horasRestantes = getHorasRestantes(membresia.fechaHasta);
+        if (horasRestantes <= 2 && horasRestantes > 0) return 'por_vencer';
+      } else {
+        // Para planes mensuales, verificar los próximos 7 días
+        const diasRestantes = getDiasRestantes(membresia.fechaHasta);
+        if (diasRestantes <= 7 && diasRestantes > 0) return 'por_vencer';
+      }
       
       return 'activa';
     }
     
-    // Si no hay fechas de vigencia, usar el estado original
     return membresia.estado || 'sin_plan';
   };
 
@@ -105,6 +159,7 @@ export default function ProfileInfo() {
     if (!estudiante?.membresia) return true;
     
     const estadoReal = getEstadoReal(estudiante.membresia);
+    // ✅ CORREGIDO: Permitir contratar si está vencido (usuario debe resetear manualmente)
     return estadoReal === 'sin_plan' || estadoReal === 'vencido' || estadoReal === 'cancelada';
   };
 
@@ -119,13 +174,12 @@ export default function ProfileInfo() {
         if (!snapshot.empty) {
           const estudianteData = { 
             ...snapshot.docs[0].data(), 
-            id: snapshot.docs[0].id 
+            uid: snapshot.docs[0].id
           } as Estudiante;
           
-          // Asegurar que membresia tenga la estructura correcta
           if (estudianteData.membresia) {
-            // Convertir fechas string a Timestamp si es necesario
             const membresia = estudianteData.membresia;
+            // Asegurarse de que Timestamp se maneje correctamente, si viene como string
             if (membresia.fechaDesde && typeof membresia.fechaDesde === 'string') {
               membresia.fechaDesde = Timestamp.fromDate(new Date(membresia.fechaDesde));
             }
@@ -183,7 +237,7 @@ export default function ProfileInfo() {
       reader.onload = async (e) => {
         const imageDataUrl = e.target?.result as string;
         
-        await updateDoc(doc(db, 'students', estudiante.id), { 
+        await updateDoc(doc(db, 'students', estudiante.uid), { 
           fotoURL: imageDataUrl 
         });
         
@@ -220,12 +274,11 @@ export default function ProfileInfo() {
         'membresia.estado': 'pendiente',
         'membresia.montoPagado': 0,
         'membresia.medioPago': '',
-        // Solo se crean vacíos hasta que se haga el pago
         'membresia.fechaDesde': null,
         'membresia.fechaHasta': null,
       };
 
-      await updateDoc(doc(db, 'students', estudiante.id), updateData);
+      await updateDoc(doc(db, 'students', estudiante.uid), updateData);
       
       setEstudiante({ 
         ...estudiante, 
@@ -240,7 +293,12 @@ export default function ProfileInfo() {
         }
       });
       
-      setMensaje('¡Plan solicitado! Una vez que realices el pago, tendrás acceso por 1 mes completo desde la fecha de pago.');
+      // ✅ MEJORADO: Mensaje específico según tipo de plan
+      const tiempoVigencia = isPaseDiario(plan.name) 
+        ? 'hasta las 23:59 de hoy' 
+        : 'por 1 mes completo';
+      
+      setMensaje(`¡Plan solicitado! Una vez que realices el pago, tendrás acceso ${tiempoVigencia} desde la fecha de pago.`);
     } catch (error) {
       console.error('Error al contratar plan:', error);
       setMensaje('Error al contratar el plan. Intentá nuevamente.');
@@ -267,92 +325,115 @@ export default function ProfileInfo() {
     setShowPaymentModal(true);
   };
 
+  // ✅ MEJORADA: Función de pago con Mercado Pago con fechas específicas
   const handlePayWithMercadoPago = async (plan: Plan) => {
+    if (!estudiante) return;
+
     setPaymentLoading(true);
     try {
-      if (!estudiante) {
-        setMensaje('Error: No se encontró información del estudiante');
-        return;
-      }
-
-      // Usar EXACTAMENTE la misma estructura que PaymentsTable
+      console.log('🚀 Iniciando proceso de pago con Mercado Pago para:', plan.name);
+      
+      // ✅ NUEVO: Calcular fechas según el tipo de plan
+      const { fechaDesde, fechaHasta } = calcularFechasPlan(plan);
+      
       const paymentData = {
         fullName: estudiante.fullName,
         amount: plan.price,
-        method: 'Mercado Pago Hospedado', // Usar el mismo método que en PaymentsTable
-        date: new Date().toISOString().split('T')[0],
-        facturado: false, // Inicialmente false, se actualiza cuando se confirme el pago
         plan: plan.name,
-        studentId: estudiante.id,
-        // Campos adicionales para Mercado Pago
-        status: 'pending',
-        mercadoPagoId: '', // Se llenará después
+        studentId: estudiante.uid,
+        studentEmail: estudiante.email,
+        // ✅ NUEVO: Incluir información de fechas en el pago
+        fechaDesde: fechaDesde.toDate().toISOString(),
+        fechaHasta: fechaHasta.toDate().toISOString(),
+        tipoPlan: isPaseDiario(plan.name) ? 'diario' : 'mensual'
       };
 
-      console.log('=== CREANDO PAGO MERCADO PAGO ===');
-      console.log('Datos del pago:', paymentData);
-
-      // 1. Crear el registro de pago en la colección 'payments' (igual que PaymentsTable)
-      const docRef = await addDoc(collection(db, 'payments'), paymentData);
-      console.log('✅ Pago creado con ID:', docRef.id);
-
-      // 2. Aquí iría la lógica para crear la preferencia en Mercado Pago
-      // Por ahora simulamos la creación de la preferencia
-      const mockMercadoPagoResponse = {
-        id: 'MP_' + Date.now(),
-        init_point: `https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=MP_${Date.now()}`,
-        status: 'pending'
+      const requestData = {
+        paymentData: {
+          ...paymentData,
+          method: "Mercado Pago Hospedado",
+          date: new Date().toISOString(),
+          facturado: false
+        }
       };
-
-      // 3. Actualizar el pago con el ID de Mercado Pago
-      await updateDoc(doc(db, 'payments', docRef.id), {
-        mercadoPagoId: mockMercadoPagoResponse.id,
-        status: 'pending'
+      
+      const response = await fetch('http://localhost:4000/api/payments/create-preference', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
       });
 
-      // 4. Actualizar el estudiante con estado 'pendiente' (igual que efectivo pero sin activar aún)
-      const studentRef = doc(db, 'students', estudiante.id);
-      const updateData = {
-        plan: plan.name,
-        'membresia.nombre': plan.name,
-        'membresia.estado': 'pendiente', // Pendiente hasta que se confirme el pago
-        'membresia.montoPagado': 0, // Aún no pagado
-        'membresia.medioPago': 'Mercado Pago Hospedado',
-        'membresia.fechaDesde': null, // Se establecerá cuando se confirme el pago
-        'membresia.fechaHasta': null,
-        // NO establecemos activo: true hasta confirmar el pago
-      };
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Error del backend:', errorData);
+        throw new Error(errorData.error || `Error ${response.status}`);
+      }
 
-      await updateDoc(studentRef, updateData);
-      console.log('✅ Estudiante actualizado con estado pendiente');
-
-      setMensaje('¡Redirigiendo a Mercado Pago! Tu plan se activará automáticamente cuando confirmes el pago.');
-      setShowPaymentModal(false);
+      const data = await response.json();
+      console.log('✅ Preferencia creada:', data);
       
-      // Simular redirección a Mercado Pago
-      console.log('🔗 URL de pago:', mockMercadoPagoResponse.init_point);
-      // window.open(mockMercadoPagoResponse.init_point, '_self');
+      if (data.init_point) {
+        console.log('🔄 Redirigiendo a Mercado Pago:', data.init_point);
+        window.location.href = data.init_point;
+      } else {
+        throw new Error('No se recibió URL de pago de Mercado Pago');
+      }
       
-      // Por ahora solo mostramos un alert con la URL simulada
-      alert(`Redirigiendo a Mercado Pago...\nURL: ${mockMercadoPagoResponse.init_point}`);
-      
-    } catch (error) {
-      console.error('❌ Error procesando pago con Mercado Pago:', error);
-      setMensaje('Error al procesar el pago. Intenta nuevamente.');
+    } catch (error: any) {
+      console.error('❌ Error en pago con Mercado Pago:', error);
+      setMensaje(`Error procesando pago: ${error.message}`);
     } finally {
       setPaymentLoading(false);
     }
   };
 
+  // ✅ MEJORADA: Función de pago en efectivo con fechas específicas
   const handlePayWithCash = async (plan: Plan) => {
+    if (!estudiante) return;
+
     setPaymentLoading(true);
     try {
-      // Usar la lógica existente de comprarPlan que ya es consistente con PaymentsTable
-      await comprarPlan(plan);
+      console.log('🏢 Registrando pago en efectivo para:', plan.name);
+      
+      const updateData = {
+        plan: plan.name,
+        'membresia.nombre': plan.name,
+        'membresia.estado': 'pendiente',
+        'membresia.montoPagado': 0,
+        'membresia.medioPago': 'Efectivo',
+        'membresia.fechaDesde': null,
+        'membresia.fechaHasta': null,
+      };
+
+      await updateDoc(doc(db, 'students', estudiante.uid), updateData);
+      
+      setEstudiante({ 
+        ...estudiante, 
+        plan: plan.name,
+        membresia: {
+          nombre: plan.name,
+          estado: 'pendiente',
+          montoPagado: 0,
+          medioPago: 'Efectivo',
+          fechaDesde: undefined,
+          fechaHasta: undefined,
+        }
+      });
+      
+      // ✅ MEJORADO: Mensaje específico según tipo de plan
+      const tiempoVigencia = isPaseDiario(plan.name) 
+        ? 'hasta las 23:59 de hoy' 
+        : 'por 30 días';
+      
+      setMensaje(`✅ Solicitud registrada para ${plan.name}. Dirigite a recepción para completar el pago de $${plan.price.toLocaleString()}. Una vez confirmado el pago, tendrás acceso ${tiempoVigencia}.`);
       setShowPaymentModal(false);
-    } catch (error) {
-      console.error('Error procesando pago en efectivo:', error);
-      setMensaje('Error al procesar la solicitud. Intenta nuevamente.');
+      setSelectedPlan(null);
+      
+    } catch (error: any) {
+      console.error('❌ Error en pago en efectivo:', error);
+      setMensaje(`Error registrando pago: ${error.message}`);
     } finally {
       setPaymentLoading(false);
     }
@@ -364,15 +445,14 @@ export default function ProfileInfo() {
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="flex flex-col items-center space-y-6"
+          className="flex flex-col items-center space-y-4 lg:space-y-6"
         >
           <div className="relative">
-            <div className="w-20 h-20 border-4 border-purple-200 rounded-full animate-spin"></div>
-            <div className="absolute inset-0 w-20 h-20 border-4 border-tent-orange border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-16 h-16 lg:w-20 lg:h-20 border-4 border-purple-200 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 w-16 h-16 lg:w-20 lg:h-20 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Cargando tu perfil...</h2>
-          
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-800 mb-2">Cargando tu perfil...</h2>
           </div>
         </motion.div>
       </div>
@@ -380,159 +460,164 @@ export default function ProfileInfo() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-4">
-      <div className="max-w-4xl mx-auto space-y-8">
-        
-        {/* Header Principal del Perfil */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-2xl overflow-hidden"
-        >
-          {/* Banner superior con gradiente */}
-          <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 h-32 relative">
-            <div className="absolute inset-0 bg-black bg-opacity-20"></div>
-            <div className="absolute bottom-0 left-0 right-0 p-6">
-              <div className="flex items-end space-x-4">
-                {/* Foto de perfil */}
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-full overflow-hidden bg-white border-4 border-white shadow-xl">
-                    <img
-                      src={estudiante?.fotoURL || '/logorecortadoo.jpg'}
-                      alt="Foto de perfil"
-                      className="w-full h-full object-cover"
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+      {/* Layout Mobile-First Optimizado */}
+      <div className="px-3 py-4 lg:px-6 lg:py-6">
+        <div className="max-w-sm mx-auto sm:max-w-xl md:max-w-3xl lg:max-w-6xl space-y-4 lg:space-y-8">
+          
+          {/* Header Ultra Compacto para Móvil */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-xl lg:rounded-3xl shadow-xl overflow-hidden"
+          >
+            {/* Banner Super Compacto */}
+            <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 h-16 lg:h-32 relative">
+              <div className="absolute inset-0 bg-black bg-opacity-20"></div>
+              <div className="absolute bottom-0 left-0 right-0 p-3 lg:p-6">
+                <div className="flex items-end space-x-2 lg:space-x-3">
+                  {/* Foto Súper Compacta */}
+                  <div className="relative">
+                    <div className="w-10 h-10 lg:w-24 lg:h-24 rounded-full overflow-hidden bg-white border-2 border-white shadow-xl">
+                      <img
+                        src={estudiante?.fotoURL || 'https://placehold.co/100x100/aabbcc/ffffff?text=User'}
+                        alt="Foto de perfil"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={triggerFileInput}
+                      disabled={uploadingPhoto}
+                      className="absolute -bottom-0.5 -right-0.5 lg:-bottom-1 lg:-right-1 w-4 h-4 lg:w-8 lg:h-8 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg disabled:opacity-50"
+                    >
+                      {uploadingPhoto ? (
+                        <div className="w-2 h-2 lg:w-4 lg:h-4 border border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Camera size={8} className="lg:w-4 lg:h-4" />
+                      )}
+                    </motion.button>
+                    
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
                     />
                   </div>
                   
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={triggerFileInput}
-                    disabled={uploadingPhoto}
-                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg disabled:opacity-50"
-                  >
-                    {uploadingPhoto ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <Camera size={14} />
-                    )}
-                  </motion.button>
-                  
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                  />
+                  {/* Info Usuario Súper Compacta */}
+                  <div className="text-white mb-0.5 lg:mb-1 flex-1 min-w-0">
+                    <h1 className="text-xs sm:text-sm lg:text-2xl font-bold truncate">{estudiante?.fullName}</h1>
+                    <p className="text-white/80 text-xs lg:text-base truncate">{estudiante?.email}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contenido Header Súper Compacto */}
+            <div className="p-3 lg:p-8">
+              <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 mb-3 lg:mb-6">
+                <div className="flex flex-col space-y-1 lg:flex-row lg:items-center lg:space-y-0 lg:space-x-4">
+                  <div className="flex items-center space-x-1 lg:space-x-2">
+                    <Crown className="text-yellow-500 w-3 h-3 lg:w-4 lg:h-4" />
+                    <span className="text-xs sm:text-sm lg:text-lg font-semibold text-gray-800">Perfil de Estudiante</span>
+                  </div>
+                  <span className="bg-gradient-to-r from-orange-500 to-pink-100 text-black px-2 py-0.5 lg:py-1 rounded-full text-xs font-medium border border-orange-300 self-start">
+                    Código: {estudiante?.accessCode}
+                  </span>
                 </div>
                 
-                {/* Información del usuario */}
-                <div className="text-white mb-2">
-                  <h1 className="text-2xl font-bold">{estudiante?.fullName}</h1>
-                  <p className="text-white/80">{estudiante?.email}</p>
-                </div>
+                {estudiante && (
+                  <EditProfile
+                    estudiante={estudiante}
+                    onUpdate={handleUpdateEstudiante}
+                    onMessage={setMensaje}
+                  />
+                )}
               </div>
-            </div>
-          </div>
 
-          {/* Contenido del header */}
-          <div className="p-8 pt-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Crown className="text-yellow-500" size={24} />
-                  <span className="text-lg font-semibold text-gray-800">Perfil de Estudiante</span>
+              {/* Info Cards Compactas - Stack completo en móvil */}
+              <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-2 lg:gap-4 lg:space-y-0 mb-3 lg:mb-6">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2 lg:p-3 border border-blue-200">
+                  <div className="flex items-center space-x-2">
+                    <User className="text-blue-600 w-3 h-3 lg:w-4 lg:h-4" />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs text-blue-700 font-medium">Teléfono</span>
+                      <div className="text-xs sm:text-sm lg:text-sm text-gray-800 font-semibold truncate">{estudiante?.phone}</div>
+                    </div>
+                  </div>
                 </div>
-                <span className="bg-gradient-to-r from-orange-500 to-pink-100 text-black px-3 py-1 rounded-full text-sm font-medium border border-tent-orange">
-                  Código: {estudiante?.accessCode}
-                </span>
-              </div>
-              
-              {estudiante && (
-                <EditProfile
-                  estudiante={estudiante}
-                  onUpdate={handleUpdateEstudiante}
-                  onMessage={setMensaje}
-                />
-              )}
-            </div>
-
-            {/* Información básica en cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
-                <div className="flex items-center space-x-3">
-                  <User className="text-blue-600" size={20} />
-                  <div>
-                    <span className="text-sm text-blue-700 font-medium">Información Personal</span>
-                    <div className="text-gray-800 font-semibold">{estudiante?.phone}</div>
+                
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2 lg:p-3 border border-green-200">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="text-green-600 w-3 h-3 lg:w-4 lg:h-4" />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs text-green-700 font-medium">Universidad</span>
+                      <div className="text-xs sm:text-sm lg:text-sm text-gray-800 font-semibold truncate">{estudiante?.university}</div>
+                    </div>
                   </div>
                 </div>
               </div>
-              
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
-                <div className="flex items-center space-x-3">
-                  <Sparkles className="text-green-600" size={20} />
+
+              {/* Mensaje Bienvenida Súper Compacto */}
+              <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg p-3 lg:p-6 border border-orange-200">
+                <div className="flex items-start space-x-2">
+                  <Heart className="text-red-500 mt-0.5 flex-shrink-0 w-3 h-3 lg:w-4 lg:h-4" />
                   <div>
-                    <span className="text-sm text-green-700 font-medium">Información Académica</span>
-                    <div className="text-gray-800 font-semibold">{estudiante?.university}</div>
+                    <h3 className="text-sm lg:text-lg font-bold text-gray-800 mb-1">¡Bienvenido/a!</h3>
+                    <p className="text-xs lg:text-base text-gray-700 leading-relaxed">
+                      Gestiona tu membresía y explora nuevos planes.
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
+          </motion.div>
 
-            {/* Mensaje de bienvenida */}
-            <div className="mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-2xl p-6 border border-orange-200">
-              <div className="flex items-center space-x-3 mb-3">
-                <Heart className="text-red-500" size={24} />
-                <h3 className="text-lg font-bold text-gray-800">¡Bienvenido/a de nuevo!</h3>
-              </div>
-              <p className="text-gray-700">
-                Estamos felices de tenerte en nuestra comunidad. Aquí podés gestionar tu membresía, 
-                explorar nuevos planes y mantener actualizada tu información personal.
-              </p>
-            </div>
-          </div>
-        </motion.div>
+          {/* Componente de Membresía */}
+          {estudiante && (
+            <MembresiaProfile
+              estudiante={estudiante}
+              planes={planes}
+              onMessage={setMensaje}
+            />
+          )}
 
-        {/* Componente de Membresía */}
-        {estudiante && (
-          <MembresiaProfile
-            estudiante={estudiante}
+          {/* Componente de Planes */}
+          <PlansProfile
             planes={planes}
+            onComprarPlan={comprarPlan}
+            onSeleccionarMetodoPago={handleSeleccionarMetodoPago}
+            loading={loading}
+            puedeContratarPlan={puedeContratarPlan()}
+            estudianteConPlan={!!estudiante?.plan}
           />
-        )}
 
-        {/* Componente de Planes */}
-        <PlansProfile
-          planes={planes}
-          onComprarPlan={comprarPlan}
-          onSeleccionarMetodoPago={handleSeleccionarMetodoPago}
-          loading={loading}
-          puedeContratarPlan={puedeContratarPlan()}
-          estudianteConPlan={!!estudiante?.plan}
-        />
-
-        {/* Botón de cerrar sesión */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="text-center"
-        >
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={cerrarSesion}
-            className="flex items-center space-x-3 mx-auto px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+          {/* Botón Cerrar Sesión Súper Compacto */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-center"
           >
-            <LogOut size={20} />
-            <span>Cerrar Sesión</span>
-          </motion.button>
-        </motion.div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={cerrarSesion}
+              className="flex items-center space-x-2 mx-auto px-4 py-2 lg:px-8 lg:py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg lg:rounded-2xl font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl text-sm lg:text-base"
+            >
+              <LogOut size={14} className="lg:w-4 lg:h-4" />
+              <span>Cerrar Sesión</span>
+            </motion.button>
+          </motion.div>
+        </div>
       </div>
 
-      {/* Modal de selección de método de pago */}
+      {/* Modal de pago - ✅ CORREGIDO con las funciones necesarias */}
       <PaymentProfile
         plan={selectedPlan}
         isOpen={showPaymentModal}
@@ -540,9 +625,15 @@ export default function ProfileInfo() {
           setShowPaymentModal(false);
           setSelectedPlan(null);
         }}
+        loading={paymentLoading}
+        onMessage={setMensaje}
         onPayWithMercadoPago={handlePayWithMercadoPago}
         onPayWithCash={handlePayWithCash}
-        loading={paymentLoading}
+        studentData={{
+          id: estudiante?.uid || '',
+          fullName: estudiante?.fullName || '',
+          email: estudiante?.email || ''
+        }}
       />
 
       {/* Modal de mensaje */}
@@ -558,30 +649,30 @@ export default function ProfileInfo() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl"
+              className="bg-white rounded-2xl p-4 lg:p-6 max-w-sm w-full text-center shadow-2xl"
             >
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
+              <div className={`w-12 h-12 lg:w-16 lg:h-16 rounded-full flex items-center justify-center mx-auto mb-3 lg:mb-4 ${
                 mensaje.includes('Error') || mensaje.includes('error') 
                   ? 'bg-red-100' 
                   : 'bg-green-100'
               }`}>
                 {mensaje.includes('Error') || mensaje.includes('error') ? (
-                  <XCircle className="text-red-600" size={40} />
+                  <XCircle className="text-red-600 w-6 h-6 lg:w-8 lg:h-8" />
                 ) : (
-                  <CheckCircle className="text-green-600" size={40} />
+                  <CheckCircle className="text-green-600 w-6 h-6 lg:w-8 lg:h-8" />
                 )}
               </div>
               
-              <h3 className="text-2xl font-bold text-gray-800 mb-3">
+              <h3 className="text-base lg:text-lg font-bold text-gray-800 mb-2">
                 {mensaje.includes('Error') || mensaje.includes('error') ? '¡Oops!' : '¡Perfecto!'}
               </h3>
-              <p className="text-gray-600 mb-8 leading-relaxed">{mensaje}</p>
+              <p className="text-sm lg:text-sm text-gray-600 mb-4 lg:mb-6 leading-relaxed">{mensaje}</p>
               
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setMensaje(null)}
-                className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200"
+                className="w-full py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-sm lg:text-base"
               >
                 Continuar
               </motion.button>

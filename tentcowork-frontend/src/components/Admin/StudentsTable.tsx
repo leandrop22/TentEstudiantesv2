@@ -18,13 +18,13 @@ import {
   Download,
   User,
   AlertTriangle,
-  CreditCard
+  CreditCard,
+  Settings
 } from 'lucide-react';
-import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import * as XLSX from 'xlsx';
-import { Timestamp } from 'firebase-admin/firestore';
-
+import { Timestamp } from 'firebase/firestore';
 
 interface Student {
   id: string;
@@ -67,6 +67,7 @@ interface Plan {
 interface StudentsTableProps {
   availablePlans?: Plan[];
 }
+
 // Función helper para formatear fecha
 const formatDate = (timestamp: any) => {
   if (!timestamp) return 'No registrada';
@@ -90,7 +91,6 @@ const formatDate = (timestamp: any) => {
     return 'No registrada';
   }
 };
-
 
 const universities = [
   { value: 'UNCUYO', label: 'Universidad Nacional de Cuyo (UNCUYO)' },
@@ -121,6 +121,12 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showDeleteMultipleConfirm, setShowDeleteMultipleConfirm] = useState(false);
   const [exporting, setExporting] = useState(false);
+  
+  // Estados para acciones administrativas
+  const [showAdminActions, setShowAdminActions] = useState<string | null>(null);
+  const [adminAction, setAdminAction] = useState<'reset' | 'activate' | 'deactivate' | null>(null);
+  const [isProcessingAdmin, setIsProcessingAdmin] = useState(false);
+  
   const [filters, setFilters] = useState({
     name: '',
     university: '',
@@ -179,6 +185,127 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     if (staticPlan) return staticPlan.label;
     
     return student.plan || 'Sin plan';
+  };
+
+  // Función para limpiar/resetear membresía
+  const handleResetMembership = async (studentId: string) => {
+    setIsProcessingAdmin(true);
+    try {
+      console.log('=== RESETEANDO MEMBRESÍA ===');
+      console.log('Student ID:', studentId);
+      
+      const studentRef = doc(db, 'students', studentId);
+      
+      // Limpiar completamente la membresía
+      const updateData = {
+        plan: '',
+        'membresia.nombre': '',
+        'membresia.estado': '',
+        'membresia.montoPagado': 0,
+        'membresia.medioPago': '',
+        'membresia.fechaDesde': null,
+        'membresia.fechaHasta': null,
+        'membresia.motivoCancelacion': null,
+        'membresia.fechaCancelacion': null,
+        activo: false
+      };
+      
+      await updateDoc(studentRef, updateData);
+      console.log('✅ Membresía reseteada exitosamente');
+      
+      // Actualizar estado local
+      setStudents(prev => prev.map(student => 
+        student.id === studentId 
+          ? { 
+              ...student, 
+              plan: '',
+              membresia: {
+                nombre: '',
+                estado: '',
+                montoPagado: 0,
+                medioPago: ''
+              },
+              activo: false
+            }
+          : student
+      ));
+      
+      setShowAdminActions(null);
+      setAdminAction(null);
+      alert('✅ Membresía reseteada. El estudiante puede contratar un nuevo plan.');
+      
+    } catch (error: any) {
+      console.error('❌ Error al resetear membresía:', error);
+      alert('Error al resetear membresía: ' + error.message);
+    } finally {
+      setIsProcessingAdmin(false);
+    }
+  };
+
+  // Función para activar/desactivar estudiante
+  const handleToggleStudentStatus = async (studentId: string, newStatus: boolean) => {
+    setIsProcessingAdmin(true);
+    try {
+      console.log('=== CAMBIANDO ESTADO DEL ESTUDIANTE ===');
+      console.log('Student ID:', studentId);
+      console.log('Nuevo estado:', newStatus);
+      
+      const studentRef = doc(db, 'students', studentId);
+      await updateDoc(studentRef, { activo: newStatus });
+      
+      // Actualizar estado local
+      setStudents(prev => prev.map(student => 
+        student.id === studentId 
+          ? { ...student, activo: newStatus }
+          : student
+      ));
+      
+      setShowAdminActions(null);
+      setAdminAction(null);
+      alert(`✅ Estudiante ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+      
+    } catch (error: any) {
+      console.error('❌ Error al cambiar estado:', error);
+      alert('Error al cambiar estado: ' + error.message);
+    } finally {
+      setIsProcessingAdmin(false);
+    }
+  };
+
+  // Función para obtener acciones disponibles según el estado
+  const getAvailableActions = (student: Student) => {
+    const actions = [];
+    const membershipStatus = getMembershipStatus(student);
+    
+    if (membershipStatus === 'cancelada') {
+      actions.push({
+        id: 'reset',
+        label: 'Resetear Membresía',
+        icon: '🔄',
+        color: 'bg-blue-500 hover:bg-blue-600',
+        description: 'Limpiar membresía para permitir nueva contratación'
+      });
+    }
+    
+    if (student.activo) {
+      actions.push({
+        id: 'deactivate',
+        label: 'Desactivar Estudiante',
+        icon: '❌',
+        color: 'bg-red-500 hover:bg-red-600',
+        description: 'Desactivar acceso del estudiante'
+      });
+    } else {
+      actions.push({
+        id: 'activate',
+        label: 'Activar Estudiante',
+        icon: '✅',
+        color: 'bg-green-500 hover:bg-green-600',
+        description: 'Activar acceso del estudiante'
+      });
+    }
+    
+    return actions;
   };
 
   useEffect(() => {
@@ -372,6 +499,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
       case 'activa': return 'bg-green-100 text-green-700 border-green-200';
       case 'pendiente': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
       case 'no pagado': return 'bg-red-100 text-red-700 border-red-200';
+      case 'cancelada': return 'bg-gray-100 text-gray-700 border-gray-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
@@ -381,6 +509,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
       case 'activa': return <CheckCircle size={14} />;
       case 'pendiente': return <AlertCircle size={14} />;
       case 'no pagado': return <XCircle size={14} />;
+      case 'cancelada': return <XCircle size={14} />;
       default: return <AlertCircle size={14} />;
     }
   };
@@ -567,6 +696,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                 <option value="activa">Activo</option>
                 <option value="pendiente">Pendiente</option>
                 <option value="no pagado">No pagado</option>
+                <option value="cancelada">Cancelada</option>
               </select>
               
               <select
@@ -710,12 +840,22 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                         </button>
                       </td>
                       <td className="px-4 py-4">
-                        <button
-                          onClick={() => setShowDeleteConfirm(student.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setShowAdminActions(student.id)}
+                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                            title="Acciones Administrativas"
+                          >
+                            <Settings size={16} />
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteConfirm(student.id)}
+                            className="text-red-600 hover:text-red-900 p-1 rounded"
+                            title="Eliminar estudiante"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -805,18 +945,40 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                       {student.certificado ? 'Regular' : 'No cert.'}
                     </button>
                   </div>
+                  
+                  {/* Alerta especial para membresías canceladas */}
+                  {getMembershipStatus(student) === 'cancelada' && (
+                    <div className="mt-2 p-2 bg-gray-100 rounded-lg border border-gray-300">
+                      <div className="flex items-center space-x-2">
+                        <XCircle size={12} className="text-gray-600" />
+                        <span className="text-xs font-medium text-gray-700">
+                          Membresía Cancelada - Requiere Reset
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
                   <span className="text-sm font-medium text-gray-900">
                     {getMembershipName(student)}
                   </span>
-                  <button 
-                    onClick={() => setShowDeleteConfirm(student.id)}
-                    className="text-red-600 hover:text-red-900 p-1 rounded"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setShowAdminActions(student.id)}
+                      className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                      title="Acciones Administrativas"
+                    >
+                      <Settings size={14} />
+                    </button>
+                    <button 
+                      onClick={() => setShowDeleteConfirm(student.id)}
+                      className="text-red-600 hover:text-red-900 p-1 rounded"
+                      title="Eliminar estudiante"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -867,6 +1029,169 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
           </div>
         </div>
       </div>
+
+      {/* Modal de acciones administrativas */}
+      <AnimatePresence>
+        {showAdminActions && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => setShowAdminActions(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-md mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {adminAction ? (
+                // Confirmación de acción
+                <div>
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <AlertTriangle className="text-blue-600" size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Confirmar Acción</h3>
+                      <p className="text-sm text-gray-600">Esta acción modificará el estado del estudiante</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    {adminAction === 'reset' && (
+                      <div>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="text-2xl">🔄</span>
+                          <span className="font-medium text-blue-800">Resetear Membresía</span>
+                        </div>
+                        <p className="text-sm text-blue-700">
+                          Se eliminará toda la información de membresía. El estudiante podrá contratar un nuevo plan.
+                        </p>
+                      </div>
+                    )}
+                    {adminAction === 'activate' && (
+                      <div>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="text-2xl">✅</span>
+                          <span className="font-medium text-green-800">Activar Estudiante</span>
+                        </div>
+                        <p className="text-sm text-green-700">
+                          El estudiante tendrá acceso a las instalaciones.
+                        </p>
+                      </div>
+                    )}
+                    {adminAction === 'deactivate' && (
+                      <div>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="text-2xl">❌</span>
+                          <span className="font-medium text-red-800">Desactivar Estudiante</span>
+                        </div>
+                        <p className="text-sm text-red-700">
+                          El estudiante no tendrá acceso a las instalaciones.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => setAdminAction(null)}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => {
+                        const student = students.find(s => s.id === showAdminActions);
+                        if (student) {
+                          if (adminAction === 'reset') {
+                            handleResetMembership(student.id);
+                          } else if (adminAction === 'activate') {
+                            handleToggleStudentStatus(student.id, true);
+                          } else if (adminAction === 'deactivate') {
+                            handleToggleStudentStatus(student.id, false);
+                          }
+                        }
+                      }}
+                      disabled={isProcessingAdmin}
+                      className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2 ${
+                        adminAction === 'reset' ? 'bg-blue-600 hover:bg-blue-700' :
+                        adminAction === 'activate' ? 'bg-green-600 hover:bg-green-700' :
+                        'bg-red-600 hover:bg-red-700'
+                      }`}
+                    >
+                      {isProcessingAdmin ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Procesando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>
+                            {adminAction === 'reset' ? '🔄' : 
+                             adminAction === 'activate' ? '✅' : '❌'}
+                          </span>
+                          <span>Confirmar</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Selección de acción
+                <div>
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                      <Settings className="text-orange-600" size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Acciones Administrativas</h3>
+                      <p className="text-sm text-gray-600">Selecciona una acción para este estudiante</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {(() => {
+                      const student = students.find(s => s.id === showAdminActions);
+                      if (!student) return null;
+                      
+                      const availableActions = getAvailableActions(student);
+                      
+                      return availableActions.map((action) => (
+                        <button
+                          key={action.id}
+                          onClick={() => setAdminAction(action.id as 'reset' | 'activate' | 'deactivate')}
+                          className={`w-full p-4 rounded-lg border-2 hover:border-opacity-50 transition-all text-left ${action.color.replace('bg-', 'hover:bg-').replace('hover:bg-', 'hover:bg-opacity-10 border-')}`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <span className="text-2xl">{action.icon}</span>
+                            <div>
+                              <div className="font-medium text-gray-900">{action.label}</div>
+                              <div className="text-sm text-gray-600">{action.description}</div>
+                            </div>
+                          </div>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+
+                  <div className="mt-6">
+                    <button
+                      onClick={() => setShowAdminActions(null)}
+                      className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modal de confirmación de eliminación individual */}
       <AnimatePresence>
