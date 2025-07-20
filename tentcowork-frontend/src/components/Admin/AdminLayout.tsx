@@ -69,8 +69,7 @@ const AdminLayout: React.FC = () => {
 
   const checkStudentsUsingPlan = async (planId: string): Promise<number> => {
     try {
-      console.log('=== VERIFICANDO ESTUDIANTES QUE USAN EL PLAN ===');
-      console.log('Plan ID a verificar:', planId);
+    
 
       // Primero, obtener el nombre del plan basado en el ID
       const plan = plans.find(p => p.id === planId);
@@ -129,8 +128,7 @@ const AdminLayout: React.FC = () => {
         }
       });
 
-      console.log(`📊 Total encontrados (método directo): ${totalCount}`);
-      console.log(`📊 Total encontrados (verificación exhaustiva): ${debugCount}`);
+     
       
       // Usar el conteo de verificación exhaustiva para mayor precisión
       return debugCount;

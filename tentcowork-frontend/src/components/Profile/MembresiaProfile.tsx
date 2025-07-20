@@ -204,8 +204,7 @@ const MembresiaProfile: React.FC<MembresiaProfileProps> = ({
     
     setIsProcessing(true);
     try {
-      console.log('=== RESETEANDO MEMBRESÍA ===');
-      console.log('Student ID:', estudiante.uid);
+      
       
       const studentRef = doc(db, 'students', estudiante.uid);
       
@@ -224,7 +223,7 @@ const MembresiaProfile: React.FC<MembresiaProfileProps> = ({
       };
       
       await updateDoc(studentRef, updateData);
-      console.log('✅ Membresía reseteada exitosamente');
+   
       
       // Notificar al usuario
       onMessage('✅ Membresía reseteada. Ya puedes contratar un nuevo plan.');

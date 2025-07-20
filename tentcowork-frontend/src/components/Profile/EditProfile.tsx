@@ -124,11 +124,7 @@ const EditProfile: React.FC<EditProfileProps> = ({ estudiante, onUpdate, onMessa
 
      const userAuthUid = auth.currentUser.uid;  
     
-    // *** ESTOS CONSOLE.LOG SON CLAVE ***
-    console.log('DEBUG: auth.currentUser?.uid:', auth.currentUser?.uid);
-    console.log('DEBUG: estudiante.uid (ID del documento Firestore):', estudiante.uid);
-    console.log('DEBUG: userUid (variable local):', userAuthUid);
-
+ 
 
     setPhotoLoading(true);
     try {
@@ -136,7 +132,7 @@ const EditProfile: React.FC<EditProfileProps> = ({ estudiante, onUpdate, onMessa
       if (currentFotoURL && currentFotoURL.includes('firebase') && currentFotoURL.includes(userAuthUid) && currentFotoURL !== previewUrl) {
           try {
             const oldPhotoRef = ref(storage, currentFotoURL);
-            console.log('DEBUG: Intentando eliminar foto antigua de Storage:', currentFotoURL); // Agregado para depuración
+           
             await deleteObject(oldPhotoRef);
           } catch (error) {
             console.log('DEBUG: No se pudo eliminar la foto antigua de Storage, continuando...', error); // Agregado para depuración
@@ -149,12 +145,12 @@ const EditProfile: React.FC<EditProfileProps> = ({ estudiante, onUpdate, onMessa
       const fileName = `profile-photos/${userAuthUid}/${timestamp}.${fileExtension}`;
       const storageRef = ref(storage, fileName);
 
-      console.log('DEBUG: Ruta de Storage que se intenta usar:', fileName); // Agregado para depuración
+    
 
       const uploadResult = await uploadBytes(storageRef, selectedFile);
       const downloadURL = await getDownloadURL(uploadResult.ref);
       
-      console.log('DEBUG: Foto subida exitosamente. URL:', downloadURL); // Agregado para depuración
+      
       return downloadURL;
     } catch (error) {
       console.error('Error uploading photo:', error);

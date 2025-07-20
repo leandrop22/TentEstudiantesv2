@@ -79,18 +79,14 @@ export default function ProfileInfo() {
       fechaHasta = new Date(ahora);
       fechaHasta.setHours(23, 59, 59, 999); // Hasta las 23:59:59.999
       
-      console.log(`📅 Pase Diario: ${plan.name}`);
-      console.log(`⏰ Desde: ${fechaDesde.toLocaleString()}`);
-      console.log(`⏰ Hasta: ${fechaHasta.toLocaleString()}`);
+     
     } else {
       // Para planes mensuales: desde ahora hasta dentro de 30 días
       fechaDesde = new Date(ahora);
       fechaHasta = new Date(ahora);
       fechaHasta.setDate(fechaHasta.getDate() + 30); // 30 días
       
-      console.log(`📅 Plan Mensual: ${plan.name}`);
-      console.log(`⏰ Desde: ${fechaDesde.toLocaleString()}`);
-      console.log(`⏰ Hasta: ${fechaHasta.toLocaleString()}`);
+    
     }
 
     return {
@@ -189,7 +185,7 @@ export default function ProfileInfo() {
           }
           
           setEstudiante(estudianteData);
-          console.log('Estudiante cargado:', estudianteData);
+          
         }
 
         const planesSnap = await getDocs(collection(db, 'plans'));
@@ -206,7 +202,7 @@ export default function ProfileInfo() {
           };
         });
         setPlanes(planesList);
-        console.log('Planes cargados:', planesList);
+      
       } catch (error) {
         console.error('Error cargando datos:', error);
       } finally {
@@ -331,7 +327,7 @@ export default function ProfileInfo() {
 
     setPaymentLoading(true);
     try {
-      console.log('🚀 Iniciando proceso de pago con Mercado Pago para:', plan.name);
+      
       
       // ✅ NUEVO: Calcular fechas según el tipo de plan
       const { fechaDesde, fechaHasta } = calcularFechasPlan(plan);
@@ -372,10 +368,10 @@ export default function ProfileInfo() {
       }
 
       const data = await response.json();
-      console.log('✅ Preferencia creada:', data);
+   
       
       if (data.init_point) {
-        console.log('🔄 Redirigiendo a Mercado Pago:', data.init_point);
+        
         window.location.href = data.init_point;
       } else {
         throw new Error('No se recibió URL de pago de Mercado Pago');
@@ -395,7 +391,7 @@ export default function ProfileInfo() {
 
     setPaymentLoading(true);
     try {
-      console.log('🏢 Registrando pago en efectivo para:', plan.name);
+      
       
       const updateData = {
         plan: plan.name,

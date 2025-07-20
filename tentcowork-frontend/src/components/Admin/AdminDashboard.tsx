@@ -147,18 +147,14 @@ const AdminDashboard: React.FC = () => {
 
       // Tipos de estudiante (certificado) - corregir lectura del campo
       const certificado = student.certificado;
-      console.log('=== DEBUG TIPO ALUMNO ===');
-      console.log('Estudiante:', student.fullName || student.name);
-      console.log('certificado:', certificado);
-      console.log('Objeto completo:', student);
-      
+            
       if (certificado == true ) {
         alumnosRegulares++;
         presentados++; // Los alumnos regulares son "presentados" (certificados)
-        console.log('✅ Contado como Alumno Regular');
+        
       } else if (certificado == null || false ) {
         noPresentados++; // Los no certificados son "no presentados"
-        console.log('✅ Contado como No Certificado');
+        
       } else {
         console.log('❓ Tipo no reconocido:', certificado);
       }
@@ -239,10 +235,7 @@ const AdminDashboard: React.FC = () => {
       // Medios de pago - normalizar y contar
       const medio = payment.medioPago || payment.medoPago || 'Efectivo';
       
-      console.log('=== DEBUG MEDIO DE PAGO ===');
-      console.log('Pago objeto:', payment);
-      console.log('Medio detectado:', medio);
-      console.log('Medios disponibles:', Object.keys(mediosPago));
+      
       
       // Si el medio de pago existe en nuestros métodos definidos, incrementar
       if (mediosPago.hasOwnProperty(medio)) {

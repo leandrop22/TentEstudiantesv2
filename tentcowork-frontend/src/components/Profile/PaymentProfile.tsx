@@ -35,7 +35,7 @@ interface PaymentProfileProps {
 // Servicio para conectar con el backend
 const createMercadoPagoPayment = async (paymentData: any): Promise<void> => {
   try {
-    console.log('🚀 Creando pago con Mercado Pago...', paymentData);
+    
     
     const requestData = {
       paymentData: {
@@ -61,11 +61,11 @@ const createMercadoPagoPayment = async (paymentData: any): Promise<void> => {
     }
 
     const data = await response.json();
-    console.log('✅ Preferencia creada:', data);
+ 
     
     // Redirigir a Mercado Pago
     if (data.init_point) {
-      console.log('🔄 Redirigiendo a Mercado Pago:', data.init_point);
+      
       window.location.href = data.init_point;
     } else {
       throw new Error('No se recibió URL de pago de Mercado Pago');
@@ -105,12 +105,11 @@ const PaymentProfile: React.FC<PaymentProfileProps> = ({
 
     try {
       if (selectedMethod === 'mercadopago') {
-        console.log('🚀 Iniciando pago con Mercado Pago...');
         // Usamos la función original que funciona perfectamente
         onPayWithMercadoPago(plan);
         
       } else if (selectedMethod === 'recepcion') {
-        console.log('🏢 Registrando pago en recepción...');
+       
         // Usamos la función original del pago en efectivo que funciona
         onPayWithCash(plan);
         onClose();

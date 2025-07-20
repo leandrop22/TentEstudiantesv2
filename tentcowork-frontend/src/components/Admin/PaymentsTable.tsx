@@ -133,9 +133,7 @@ const PaymentsTable: React.FC = () => {
       fechaHasta = new Date(fechaPago);
       fechaHasta.setHours(23, 59, 59, 999); // Hasta las 23:59:59.999
       
-      console.log(`📅 Pase Diario: ${planName}`);
-      console.log(`⏰ Desde: ${fechaDesde.toLocaleString()}`);
-      console.log(`⏰ Hasta: ${fechaHasta.toLocaleString()}`);
+     
     } else {
       // Para planes mensuales: desde la fecha del pago hasta 30 días después
       fechaDesde = new Date(fechaPago);
