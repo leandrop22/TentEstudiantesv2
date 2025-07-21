@@ -313,7 +313,7 @@ export default function RegisterForm() {
           <div className="w-28 h-28 rounded-full overflow-hidden bg-white shadow-lg mx-auto mb-6">
             <img
 
-              src="/public/logorecortadoo.jpg"
+              src="/logorecortadoo.jpg"
               alt="Logo Tent"
               className="object-cover w-full h-full"
             />

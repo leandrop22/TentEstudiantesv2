@@ -21,7 +21,7 @@ interface PaymentProfileProps {
   onClose: () => void;
   loading: boolean;
   onMessage: (message: string) => void;
-  // Agregamos las funciones que estaban en el primer código
+  // Funciones que vienen del componente padre
   onPayWithMercadoPago: (plan: Plan) => void;
   onPayWithCash: (plan: Plan) => void;
   // Datos del estudiante necesarios para el pago
@@ -32,51 +32,6 @@ interface PaymentProfileProps {
   };
 }
 
-// Servicio para conectar con el backend
-const createMercadoPagoPayment = async (paymentData: any): Promise<void> => {
-  try {
-    
-    
-    const requestData = {
-      paymentData: {
-        ...paymentData,
-        method: "Mercado Pago Hospedado",
-        date: new Date().toISOString(),
-        facturado: false
-      }
-    };
-    
-    const response = await fetch('https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend/api/payments/create-preference', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('❌ Error del backend:', errorData);
-      throw new Error(errorData.error || `Error ${response.status}`);
-    }
-
-    const data = await response.json();
- 
-    
-    // Redirigir a Mercado Pago
-    if (data.init_point) {
-      
-      window.location.href = data.init_point;
-    } else {
-      throw new Error('No se recibió URL de pago de Mercado Pago');
-    }
-    
-  } catch (error: any) {
-    console.error('❌ Error:', error);
-    throw new Error(`Error creando pago: ${error.message}`);
-  }
-};
-
 const PaymentProfile: React.FC<PaymentProfileProps> = ({
   plan,
   isOpen,
@@ -84,7 +39,6 @@ const PaymentProfile: React.FC<PaymentProfileProps> = ({
   loading,
   onMessage,
   studentData,
-  // Agregamos las props que estaban en el primer código
   onPayWithMercadoPago,
   onPayWithCash
 }) => {
@@ -105,12 +59,11 @@ const PaymentProfile: React.FC<PaymentProfileProps> = ({
 
     try {
       if (selectedMethod === 'mercadopago') {
-        // Usamos la función original que funciona perfectamente
+        // Usar la función que viene por props (ya implementada correctamente)
         onPayWithMercadoPago(plan);
         
       } else if (selectedMethod === 'recepcion') {
-       
-        // Usamos la función original del pago en efectivo que funciona
+        // Usar la función que viene por props (ya implementada correctamente)
         onPayWithCash(plan);
         onClose();
       }
@@ -166,7 +119,7 @@ const PaymentProfile: React.FC<PaymentProfileProps> = ({
             </div>
 
             <div className="p-4 lg:p-6">
-              {/* Resumen del plan seleccionado - DINÁMICO */}
+              {/* Resumen del plan seleccionado */}
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl lg:rounded-2xl p-4 lg:p-6 mb-4 lg:mb-6 border border-gray-200">
                 <div className="flex items-center justify-between mb-3 lg:mb-4">
                   <div>
@@ -226,7 +179,7 @@ const PaymentProfile: React.FC<PaymentProfileProps> = ({
                       <div className="flex items-center space-x-2 lg:space-x-3 mb-2">
                         <div className="w-8 h-6 lg:w-12 lg:h-8 bg-gradient-to-r from-blue-400 to-blue-600 rounded flex items-center justify-center">
                           <img 
-                            src="/mercadopago.png" // Ruta del logo en la carpeta public
+                            src="/mercadopago.png"
                             alt="Mercado Pago Logo" 
                             className="object-cover w-full h-full" 
                           />
@@ -288,7 +241,6 @@ const PaymentProfile: React.FC<PaymentProfileProps> = ({
                         </div>
                         <div>
                           <h5 className="font-semibold text-gray-800 text-sm lg:text-base">Pago en Recepción</h5>
-                          
                         </div>
                       </div>
                       

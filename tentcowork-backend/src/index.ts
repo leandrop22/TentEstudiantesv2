@@ -34,6 +34,6 @@ app.use('/api', paymentRoutes);
 admin.initializeApp(); // Solo si no lo inicializas en otro lado
 
 // 🆕 NUEVO: Exportar la aplicación Express como una Cloud Function
-exports.api = functions.https.onRequest(app); // 👈 ¡ESTA ES LA EXPORTACIÓN CLAVE!
+exports.backend = functions.https.onRequest(app); 
 
 initializeMercadoPago();

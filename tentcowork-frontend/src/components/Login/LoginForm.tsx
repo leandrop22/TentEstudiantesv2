@@ -68,7 +68,6 @@ export default function LoginForm() {
         return;
       }
 
-
       setError('Tu cuenta no está registrada correctamente.');
       await signOut(auth);
     } catch (err) {
@@ -116,17 +115,31 @@ export default function LoginForm() {
       const user = result.user;
       const uid = user.uid;
 
-      const res = await fetch(`/api/is-admin/${uid}`);
-        const data = await res.json();
-        if (data.isAdmin) {
-          navigate('/admin');
-          return;
+      // ✅ CORREGIDO: Usar URL completa del backend con /api/
+      try {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/is-admin/${uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.isAdmin) {
+            navigate('/admin');
+            return;
+          }
         }
+      } catch (apiError) {
+        console.error('Error checking admin status:', apiError);
+        // Continuar con verificación local si falla la API
+      }
 
+      // Verificar si es estudiante en Firestore
       const studentQuery = query(collection(db, 'students'), where('uid', '==', uid));
       const studentSnap = await getDocs(studentQuery);
       if (!studentSnap.empty) {
-        navigate('/profile');
+        const studentData = studentSnap.docs[0].data();
+        if (studentData.rol === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/profile');
+        }
         return;
       }
 
@@ -160,9 +173,7 @@ export default function LoginForm() {
         <div className="text-center mb-8">
           <div className="w-28 h-28 rounded-full overflow-hidden bg-white shadow-lg mx-auto mb-6">
             <img
-
-              src="/public/tent_icon_512.png"
-
+              src="/tent_icon_512.png"
               alt="Logo Tent"
               className="object-cover w-full h-full"
             />
@@ -256,15 +267,14 @@ export default function LoginForm() {
                 whileTap={{ scale: 0.98 }}
                 onClick={handleGoogleLogin}
                 className="w-full flex items-center justify-center gap-3 py-3 bg-gray-100 text-gray-800 font-medium rounded-full hover:bg-gray-200 transition-all duration-200 shadow-sm"
-                >
+              >
                 <img
-
-                    src="/public/google.png"
-                    alt="Google logo"
-                    className="w-5 h-5"
+                  src="/google.png"
+                  alt="Google logo"
+                  className="w-5 h-5"
                 />
-                <span><h1><b>Iniciar sesión con Google</b></h1></span>
-                </motion.button>
+                <span><b>Iniciar sesión con Google</b></span>
+              </motion.button>
 
               {/* Link to recovery */}
               <motion.button
