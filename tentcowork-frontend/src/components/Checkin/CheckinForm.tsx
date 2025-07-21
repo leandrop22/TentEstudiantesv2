@@ -443,7 +443,11 @@ export const CheckInForm = () => {
         <div className="text-center mb-1">
           <div className="w-28 h-28 rounded-full overflow-hidden bg-white shadow-lg mx-auto mb-6">
             <img
+<<<<<<< HEAD
               src="/public/logorecortadoo.jpg"
+=======
+              src="/dist/logorecortadoo.jpg"
+>>>>>>> 7a7873d2b6ab4f552595a5fec508d0605d47bae3
               alt="Logo Tent"
               className="object-cover w-full h-full"
             />

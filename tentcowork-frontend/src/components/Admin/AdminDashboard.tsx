@@ -204,6 +204,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const processPaymentMetrics = (payments: any[]) => {
+<<<<<<< HEAD
   const total = payments.length;
   const hoy = new Date().toDateString();
   
@@ -258,6 +259,63 @@ const AdminDashboard: React.FC = () => {
     mediosPago
   };
 };
+=======
+    const total = payments.length;
+    const hoy = new Date().toDateString();
+    
+    let hoyTotal = 0;
+    let pendientes = 0;
+    
+    // Inicializar todos los medios de pago con 0
+    const mediosPago: { [medio: string]: number } = {};
+    paymentMethods.forEach(method => {
+      mediosPago[method] = 0;
+    });
+
+    payments.forEach(payment => {
+      // Pagos de hoy
+      if (payment.fecha) {
+        const paymentDate = payment.fecha.toDate ? 
+          payment.fecha.toDate() : 
+          new Date(payment.fecha);
+        if (paymentDate.toDateString() === hoy) {
+          hoyTotal += payment.monto || 0;
+        }
+      }
+
+      // Pagos pendientes
+      if (payment.estado === 'pendiente') {
+        pendientes++;
+      }
+
+      // Medios de pago - normalizar y contar
+      const medio = payment.medioPago || payment.medoPago || 'Efectivo';
+      
+      
+      
+      // Si el medio de pago existe en nuestros métodos definidos, incrementar
+      if (mediosPago.hasOwnProperty(medio)) {
+        mediosPago[medio]++;
+        console.log('✅ Medio encontrado y contado:', medio);
+      } else {
+        // Si no existe, agregarlo como método no reconocido
+        console.log('❌ Medio no reconocido:', medio);
+        // Crear una entrada para "Otros" si no existe
+        if (!mediosPago['Otros']) {
+          mediosPago['Otros'] = 0;
+        }
+        mediosPago['Otros']++;
+      }
+    });
+
+    return {
+      total,
+      hoy: hoyTotal,
+      pendientes,
+      mediosPago
+    };
+  };
+>>>>>>> 7a7873d2b6ab4f552595a5fec508d0605d47bae3
 
   const processPlanMetrics = (plans: Plan[], students: any[]) => {
     const total = plans.length;
