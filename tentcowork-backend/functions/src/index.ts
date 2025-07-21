@@ -1,30 +1,25 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
+import * as functions from 'firebase-functions'; // 👈 ¡IMPORTANTE!
+import * as admin from 'firebase-admin'; // 👈 ¡IMPORTANTE! Si usas Admin SDK
 
 dotenv.config();
 
 import adminRoutes from './routes/adminRoutes';
 import paymentRoutes from './routes/paymentRoutes';
-import { initializeMercadoPago } from './controllers/paymentController';
 
-// Inicializar Firebase Admin SDK
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+import { initializeMercadoPago } from './controllers/paymentController';
 
 const app = express();
 
-// Configuración de CORS
+// Configuración de CORS (ajustar para producción)
+// En producción, el 'origin' debe ser tu dominio de Firebase Hosting:
+// 'https://tentcowork-estudiantes-v2.web.app'
+// Para desarrollo, puedes mantener 'http://localhost:5173'
 app.use(cors({
-  origin: [
-    'http://localhost:5173', 
-    'https://tentcowork-estudiantes-v2.web.app', 
-    'https://tentcowork-estudiantes-v2.firebaseapp.com'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: ['http://localhost:5173', 'https://tentcowork-estudiantes-v2.web.app', 'https://tentcowork-estudiantes-v2.firebaseapp.com'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Asegúrate de incluir todos los métodos HTTP que usas
   credentials: true
 }));
 
@@ -34,27 +29,11 @@ app.use(express.json());
 app.use('/api', adminRoutes);
 app.use('/api', paymentRoutes);
 
-// Ruta de prueba
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Backend funcionando correctamente!',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
 
-// Inicializar MercadoPago
+// 🆕 NUEVO: Inicializar Firebase Admin SDK si lo usas en tu backend
+admin.initializeApp(); // Solo si no lo inicializas en otro lado
+
+// 🆕 NUEVO: Exportar la aplicación Express como una Cloud Function
+exports.backend = functions.https.onRequest(app); 
+
 initializeMercadoPago();
-
-// 🆕 AÑADIR: Servidor local para desarrollo
-const PORT = process.env.PORT || 4000;
-
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Servidor local corriendo en http://localhost:${PORT}`);
-    console.log(`📡 API endpoints disponibles en http://localhost:${PORT}/api`);
-  });
-}
-
-// Exportar para Firebase Functions
-export const backend = functions.https.onRequest(app);

@@ -3,7 +3,9 @@ import { checkAdminStatus, assignAdminRole } from '../controllers/adminControlle
 
 const router = Router();
 
-router.get('/is-admin/:uid', checkAdminStatus);
-router.post('/assign-admin', assignAdminRole);
+
+router.get('/is-admin/:uid', checkAdminStatus);        // ✅ SIN /api/
+router.post('/assign-admin', assignAdminRole);         // ✅ SIN /api/
+
 
 export default router;

@@ -205,7 +205,7 @@ const AdminDashboard: React.FC = () => {
 
   const processPaymentMetrics = (payments: any[]) => {
     const total = payments.length;
-    const hoy = new Date().toDateString();
+    const hoy = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
     
     let hoyTotal = 0;
     let pendientes = 0;
@@ -219,27 +219,30 @@ const AdminDashboard: React.FC = () => {
     payments.forEach((payment, index) => {
       console.log(`🔍 Pago ${index + 1}:`, payment);
       
-      // Pagos de hoy
-      if (payment.fecha) {
-        const paymentDate = payment.fecha.toDate ? 
-          payment.fecha.toDate() : 
-          new Date(payment.fecha);
-        if (paymentDate.toDateString() === hoy) {
-          hoyTotal += payment.monto || 0;
+      // ✅ CORREGIDO: Pagos de hoy usando el campo correcto 'date' en formato YYYY-MM-DD
+      if (payment.date) {
+        console.log(`📅 Comparando fecha del pago: "${payment.date}" con hoy: "${hoy}"`);
+        if (payment.date === hoy) {
+          // ✅ CORREGIDO: Usar 'amount' en lugar de 'monto'
+          const amount = payment.amount || payment.monto || 0;
+          hoyTotal += amount;
+          console.log(`💰 Pago de hoy encontrado: $${amount}`);
         }
       }
 
-      // Pagos pendientes
-      if (payment.estado === 'pendiente') {
+      // ✅ CORREGIDO: Verificar pagos pendientes usando el campo 'facturado'
+      // Si no está facturado, considerarlo como pendiente
+      if (payment.facturado === false || payment.estado === 'pendiente') {
         pendientes++;
+        console.log(`⏳ Pago pendiente encontrado`);
       }
 
       // Medios de pago - usar múltiples campos posibles
       const posiblesCampos = [
+        payment.method,         // ✅ Campo principal en PaymentsTable
         payment.medioPago,
         payment.medoPago, 
         payment.metodo,
-        payment.method,
         payment.paymentMethod,
         payment.tipo,
         payment.medio
@@ -266,6 +269,12 @@ const AdminDashboard: React.FC = () => {
         mediosPago['Otros']++;
       }
     });
+
+    console.log(`💰 RESUMEN DE PAGOS:`);
+    console.log(`   Total pagos: ${total}`);
+    console.log(`   Pagos de hoy: $${hoyTotal}`);
+    console.log(`   Pagos pendientes: ${pendientes}`);
+    console.log(`   Medios de pago:`, mediosPago);
 
     return {
       total,
@@ -449,7 +458,7 @@ const AdminDashboard: React.FC = () => {
           <DashboardCard
             title="Pagos"
             icon={<DollarSign className="text-white" size={24} />}
-            onClick={() => navigate('https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend/api/admin/payments')}
+            onClick={() => navigate('/admin/payments')}
             gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
           >
             <MetricItem label="Total" value={metrics.payments.total} />

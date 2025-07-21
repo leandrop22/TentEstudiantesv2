@@ -2,13 +2,13 @@
   "compilerOptions": {
     "target": "es2016",
     "module": "commonjs",
-    "rootDir": "./src",
+    "rootDir": "functions/src",
     "outDir": "./dist",
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*"],
+  "include": ["functions/src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
