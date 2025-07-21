@@ -14,7 +14,7 @@ export interface MercadoPagoResponse {
 }
 
 export class PaymentService {
-  private static readonly BASE_URL = 'http://localhost:4000/api';
+  private static readonly BASE_URL = '/api';
 
   /**
    * Crea una preferencia de pago en Mercado Pago

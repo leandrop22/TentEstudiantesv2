@@ -11,7 +11,7 @@ import {
 import { auth } from '../utils/firebase';
 
 // Configuración de la API
-const API_BASE_URL = 'http://localhost:4000/api';
+const API_BASE_URL = '/api';
 
 // Tipos para las respuestas
 interface UserRoleResponse {

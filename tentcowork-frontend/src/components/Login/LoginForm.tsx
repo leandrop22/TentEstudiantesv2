@@ -116,7 +116,7 @@ export default function LoginForm() {
       const user = result.user;
       const uid = user.uid;
 
-      const res = await fetch(`http://localhost:4000/api/is-admin/${uid}`);
+      const res = await fetch(`/api/is-admin/${uid}`);
         const data = await res.json();
         if (data.isAdmin) {
           navigate('/admin');

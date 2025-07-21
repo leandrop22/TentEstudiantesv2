@@ -353,7 +353,7 @@ export default function ProfileInfo() {
         }
       };
       
-      const response = await fetch('http://localhost:4000/api/payments/create-preference', {
+      const response = await fetch('/api/payments/create-preference', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
