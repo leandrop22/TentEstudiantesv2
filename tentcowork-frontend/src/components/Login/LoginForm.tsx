@@ -160,7 +160,7 @@ export default function LoginForm() {
         <div className="text-center mb-8">
           <div className="w-28 h-28 rounded-full overflow-hidden bg-white shadow-lg mx-auto mb-6">
             <img
-              src="public/logorecortadoo.jpg"
+              src="/dist/logorecortadoo.jpg"
               alt="Logo Tent"
               className="object-cover w-full h-full"
             />
@@ -256,7 +256,7 @@ export default function LoginForm() {
                 className="w-full flex items-center justify-center gap-3 py-3 bg-gray-100 text-gray-800 font-medium rounded-full hover:bg-gray-200 transition-all duration-200 shadow-sm"
                 >
                 <img
-                    src="/public/google.png"
+                    src="/dist/google.png"
                     alt="Google logo"
                     className="w-5 h-5"
                 />
