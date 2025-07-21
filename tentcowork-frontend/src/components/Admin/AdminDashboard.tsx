@@ -204,62 +204,6 @@ const AdminDashboard: React.FC = () => {
   };
 
   const processPaymentMetrics = (payments: any[]) => {
-<<<<<<< HEAD
-  const total = payments.length;
-  const hoy = new Date().toDateString();
-  
-  let hoyTotal = 0;
-  let pendientes = 0;
-  const mediosPago: { [medio: string]: number } = {};
-
-  payments.forEach((payment, index) => {
-    console.log(`🔍 Pago ${index + 1}:`, payment);
-    
-    // Pagos de hoy
-    if (payment.fecha) {
-      const paymentDate = payment.fecha.toDate ? 
-        payment.fecha.toDate() : 
-        new Date(payment.fecha);
-      if (paymentDate.toDateString() === hoy) {
-        hoyTotal += payment.monto || 0;
-      }
-    }
-
-    // Pagos pendientes
-    if (payment.estado === 'pendiente') {
-      pendientes++;
-    }
-
-    // 🔍 Probar TODOS los campos posibles para medio de pago
-    const posiblesCampos = [
-      payment.medioPago,
-      payment.medoPago, 
-      payment.metodo,
-      payment.method,
-      payment.paymentMethod,
-      payment.tipo,
-      payment.medio
-    ];
-
-    console.log(`🔍 Campos posibles para pago ${index + 1}:`, posiblesCampos);
-
-    // Usar el primer campo que no sea undefined/null
-    let medio = posiblesCampos.find(campo => campo != null) || 'Efectivo';
-    
-    console.log(`✅ Medio seleccionado para pago ${index + 1}:`, medio);
-
-    // Contar
-    mediosPago[medio] = (mediosPago[medio] || 0) + 1;
-  });
-
-  return {
-    total,
-    hoy: hoyTotal,
-    pendientes,
-    mediosPago
-  };
-};
-=======
     const total = payments.length;
     const hoy = new Date().toDateString();
     
@@ -272,7 +216,9 @@ const AdminDashboard: React.FC = () => {
       mediosPago[method] = 0;
     });
 
-    payments.forEach(payment => {
+    payments.forEach((payment, index) => {
+      console.log(`🔍 Pago ${index + 1}:`, payment);
+      
       // Pagos de hoy
       if (payment.fecha) {
         const paymentDate = payment.fecha.toDate ? 
@@ -288,11 +234,24 @@ const AdminDashboard: React.FC = () => {
         pendientes++;
       }
 
-      // Medios de pago - normalizar y contar
-      const medio = payment.medioPago || payment.medoPago || 'Efectivo';
+      // Medios de pago - usar múltiples campos posibles
+      const posiblesCampos = [
+        payment.medioPago,
+        payment.medoPago, 
+        payment.metodo,
+        payment.method,
+        payment.paymentMethod,
+        payment.tipo,
+        payment.medio
+      ];
+
+      console.log(`🔍 Campos posibles para pago ${index + 1}:`, posiblesCampos);
+
+      // Usar el primer campo que no sea undefined/null
+      let medio = posiblesCampos.find(campo => campo != null) || 'Efectivo';
       
-      
-      
+      console.log(`✅ Medio seleccionado para pago ${index + 1}:`, medio);
+
       // Si el medio de pago existe en nuestros métodos definidos, incrementar
       if (mediosPago.hasOwnProperty(medio)) {
         mediosPago[medio]++;
@@ -315,7 +274,6 @@ const AdminDashboard: React.FC = () => {
       mediosPago
     };
   };
->>>>>>> 7a7873d2b6ab4f552595a5fec508d0605d47bae3
 
   const processPlanMetrics = (plans: Plan[], students: any[]) => {
     const total = plans.length;
