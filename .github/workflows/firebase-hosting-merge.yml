@@ -18,7 +18,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18' # Asegúrate de que esta versión coincide con tu entorno local
+          node-version: 'v22.15.0' # Asegúrate de que esta versión coincide con tu entorno local
 
       # Paso de compilación del frontend
       - name: Install Frontend Dependencies and Build
