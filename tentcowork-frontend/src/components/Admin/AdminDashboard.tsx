@@ -449,7 +449,7 @@ const AdminDashboard: React.FC = () => {
           <DashboardCard
             title="Pagos"
             icon={<DollarSign className="text-white" size={24} />}
-            onClick={() => navigate('/admin/payments')}
+            onClick={() => navigate('https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend/api/admin/payments')}
             gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
           >
             <MetricItem label="Total" value={metrics.payments.total} />

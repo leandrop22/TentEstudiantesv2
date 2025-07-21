@@ -46,7 +46,7 @@ const createMercadoPagoPayment = async (paymentData: any): Promise<void> => {
       }
     };
     
-    const response = await fetch('/api/payments/create-preference', {
+    const response = await fetch('https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend/api/payments/create-preference', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

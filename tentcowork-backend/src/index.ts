@@ -29,16 +29,6 @@ app.use(express.json());
 app.use('/api', adminRoutes);
 app.use('/api', paymentRoutes);
 
-// ❌ ELIMINA ESTO: Ya no necesitas app.listen en Cloud Functions
-// app.listen(PORT, () => {
-//   console.log(`Servidor corriendo en http://localhost:${PORT}`);
-//   console.log(`📡 Webhook Mercado Pago: http://localhost:${PORT}/api/webhook/mercadopago`);
-//   console.log(`💳 Crear preferencia: http://localhost:${PORT}/api/payments/create-preference`);
-//   console.log(`🧪 Test webhook: http://localhost:${PORT}/api/webhook/test`);
-//   console.log('🔧 Environment Check:');
-//   console.log(`   MP_ACCESS_TOKEN: ${process.env.MP_ACCESS_TOKEN ? '✅ Set' : '❌ Missing'}`);
-//   console.log(`   BACKEND_URL: ${process.env.BACKEND_URL || '❌ Not set (required for webhook)'}`);
-// });
 
 // 🆕 NUEVO: Inicializar Firebase Admin SDK si lo usas en tu backend
 admin.initializeApp(); // Solo si no lo inicializas en otro lado

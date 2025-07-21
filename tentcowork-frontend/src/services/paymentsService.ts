@@ -32,7 +32,7 @@ export class PaymentService {
         }
       };
       
-      const response = await fetch(`${this.BASE_URL}/payments/create-preference`, {
+      const response = await fetch('https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend/payments/create-preference', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
