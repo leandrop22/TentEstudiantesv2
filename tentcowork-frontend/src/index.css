@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+/* --- Botones reutilizables --- */
+.btn-primary {
+  @apply w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-all duration-200;
+}
+
+.btn-secondary {
+  @apply flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200;
+}
+
+.btn-submit {
+  @apply flex-1 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 disabled:opacity-50 transition-all duration-200;
+}
+
+/* --- Indicadores circulares --- */
+.status-circle-success {
+  @apply w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4;
+}
+
+.status-circle-error {
+  @apply w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4;
+}
+
+/* Scrollbar personalizado para listas desplegables */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
