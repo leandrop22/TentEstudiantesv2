@@ -6,9 +6,12 @@ import * as admin from 'firebase-admin'; // 👈 ¡IMPORTANTE! Si usas Admin SDK
 
 dotenv.config();
 
+
+
+
+
 import adminRoutes from './src/routes/adminRoutes';
 import paymentRoutes from './src/routes/paymentRoutes';
-
 import { initializeMercadoPago } from './src/controllers/paymentController';
 
 const app = express();
@@ -30,10 +33,9 @@ app.use('/api', adminRoutes);
 app.use('/api', paymentRoutes);
 
 
-// 🆕 NUEVO: Inicializar Firebase Admin SDK si lo usas en tu backend
-admin.initializeApp(); // Solo si no lo inicializas en otro lado
+
 
 // 🆕 NUEVO: Exportar la aplicación Express como una Cloud Function
-exports.backend = functions.https.onRequest(app); 
+exports.backend = functions.https.onRequest(app);
 
 initializeMercadoPago();

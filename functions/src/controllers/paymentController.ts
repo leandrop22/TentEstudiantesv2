@@ -1,16 +1,12 @@
 // src/controllers/paymentController.ts
 import { Request, Response } from 'express';
-import { db, admin } from '../config/firebase';
-import { 
-  MercadoPagoWebhookData, 
-  MercadoPagoPaymentStatus, 
-  PaymentRecord,
-  CreatePreferenceRequest,
-  MercadoPagoPreferenceResponse
-} from '../types/mercadoPago';
+
+
 
 // 🔧 IMPORTAR MERCADO PAGO VERSIÓN NUEVA
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
+import { admin, db } from '../config/firebase';
+import { CreatePreferenceRequest, MercadoPagoPaymentStatus, MercadoPagoPreferenceResponse, MercadoPagoWebhookData, PaymentRecord } from '../types/mercadoPago';
 
 // 🔧 CONFIGURAR MERCADO PAGO (NUEVA SINTAXIS) - CORREGIDA
 let client: MercadoPagoConfig | null = null;

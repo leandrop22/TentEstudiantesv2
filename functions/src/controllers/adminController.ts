@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { db } from '../config/firebase';
+
 import admin from 'firebase-admin';
+import { db } from '../config/firebase';
 
 export const checkAdminStatus = async (req: Request, res: Response) => {
   try {

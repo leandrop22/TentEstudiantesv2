@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { checkAdminStatus, assignAdminRole } from '../controllers/adminController';
-
-export const router = Router();
+import { assignAdminRole, checkAdminStatus } from '../controllers/adminController';
 
 
-router.get('/is-admin/:uid', checkAdminStatus);        // ✅ SIN /api/
-router.post('/assign-admin', assignAdminRole);         // ✅ SIN /api/
+const router = Router();
 
+router.get('/is-admin/:uid', checkAdminStatus);
+router.post('/assign-admin', assignAdminRole);
 
 export default router;
