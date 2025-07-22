@@ -19,9 +19,11 @@ import {
   User,
   AlertTriangle,
   CreditCard,
-  Settings
+  Settings,
+  RefreshCw,
+  UserCheck
 } from 'lucide-react';
-import { collection, getDocs, doc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, updateDoc, getDoc, query, where, limit, orderBy, getCountFromServer } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import * as XLSX from 'xlsx';
 import { Timestamp } from 'firebase/firestore';
@@ -52,7 +54,6 @@ interface Student {
   fotoURL?: string;
 }
 
-// Interfaz para los planes dinámicos
 interface Plan {
   id: string;
   name: string;
@@ -63,25 +64,30 @@ interface Plan {
   endHour: string;
 }
 
-// Props del componente
 interface StudentsTableProps {
   availablePlans?: Plan[];
 }
 
-// Función helper para formatear fecha
+// ✅ CACHE CONFIG
+const CACHE_KEY = 'studentsTableCache';
+const CACHE_DURATION = 12 * 60 * 1000; // 12 minutos
+
+interface CacheData {
+  students: Student[];
+  lastUpdate: number;
+  cacheExpiry: number;
+}
+
 const formatDate = (timestamp: any) => {
   if (!timestamp) return 'No registrada';
   
   try {
-    // Si es un timestamp de Firebase
     if (timestamp.seconds) {
       return new Date(timestamp.seconds * 1000).toLocaleDateString('es-AR');
     }
-    // Si es una fecha normal
     if (timestamp instanceof Date) {
       return timestamp.toLocaleDateString('es-AR');
     }
-    // Si es un string de fecha
     if (typeof timestamp === 'string') {
       return new Date(timestamp).toLocaleDateString('es-AR');
     }
@@ -112,6 +118,8 @@ const universities = [
 const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cacheUsed, setCacheUsed] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(0);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -122,24 +130,70 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
   const [showDeleteMultipleConfirm, setShowDeleteMultipleConfirm] = useState(false);
   const [exporting, setExporting] = useState(false);
   
-  // Estados para acciones administrativas
   const [showAdminActions, setShowAdminActions] = useState<string | null>(null);
   const [adminAction, setAdminAction] = useState<'reset' | 'activate' | 'deactivate' | null>(null);
   const [isProcessingAdmin, setIsProcessingAdmin] = useState(false);
   
+  // ✅ Filtros con estudiantes activos por defecto
   const [filters, setFilters] = useState({
     name: '',
     university: '',
-    planStatus: '',
+    planStatus: 'activa', // ✅ Filtro predeterminado de estudiantes activos
     carrera: '',
     certificado: '',
     plan: '',
   });
 
+  // ✅ Cache del navegador - Cargar datos
+  const loadFromCache = (): CacheData | null => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const data = JSON.parse(cached);
+        const now = Date.now();
+        
+        console.log('🔍 Verificando cache de estudiantes:', {
+          'Cache timestamp': new Date(data.lastUpdate).toLocaleString(),
+          'Current time': new Date(now).toLocaleString(),
+          'Cache valid': now < data.cacheExpiry
+        });
+        
+        if (now < data.cacheExpiry) {
+          console.log('✅ Usando estudiantes desde cache');
+          setCacheUsed(true);
+          return data;
+        } else {
+          console.log('⏰ Cache de estudiantes expirado');
+          localStorage.removeItem(CACHE_KEY);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error leyendo cache de estudiantes:', error);
+      localStorage.removeItem(CACHE_KEY);
+    }
+    return null;
+  };
+
+  // ✅ Cache del navegador - Guardar datos
+  const saveToCache = (studentsData: Student[]) => {
+    try {
+      const now = Date.now();
+      const dataToCache: CacheData = {
+        students: studentsData,
+        lastUpdate: now,
+        cacheExpiry: now + CACHE_DURATION
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
+      console.log('💾 Estudiantes guardados en cache hasta:', new Date(dataToCache.cacheExpiry).toLocaleString());
+      setLastUpdate(now);
+    } catch (error) {
+      console.error('❌ Error guardando cache de estudiantes:', error);
+    }
+  };
+
   // Función para obtener los planes dinámicamente
   const planes = useMemo(() => {
     if (availablePlans.length === 0) {
-      // Fallback a planes estáticos si no hay planes disponibles
       return [
         { value: 'full', label: 'Full' },
         { value: 'partime', label: 'Part-time' },
@@ -153,18 +207,15 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     }));
   }, [availablePlans]);
 
-  // Función helper para obtener la universidad
-  const getStudentuniversity = (student: Student) => {
+  const getStudentUniversity = (student: Student) => {
     return student.university || '';
   };
 
-  // Función helper para obtener el label de la universidad
-  const getuniversityLabel = (value: string) => {
+  const getUniversityLabel = (value: string) => {
     const uni = universities.find(u => u.value === value);
     return uni ? uni.label : value;
   };
 
-  // Función helper para obtener el estado de membresía
   const getMembershipStatus = (student: Student) => {
     if (student.membresia?.estado) return student.membresia.estado;
     if (student.activo === true) return 'activa';
@@ -172,22 +223,95 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     return 'pendiente';
   };
 
-  // Función helper para obtener el nombre de membresía
   const getMembershipName = (student: Student) => {
     if (student.membresia?.nombre) return student.membresia.nombre;
     
-    // Buscar el nombre del plan en los planes disponibles
     const planInfo = availablePlans.find(p => p.id === student.plan);
     if (planInfo) return planInfo.name;
     
-    // Fallback a planes estáticos
     const staticPlan = planes.find(p => p.value === student.plan);
     if (staticPlan) return staticPlan.label;
     
     return student.plan || 'Sin plan';
   };
 
-  // Función para limpiar/resetear membresía
+  // ✅ Fetch optimizado con cache
+  const fetchStudents = async (forceRefresh = false) => {
+    try {
+      setLoading(true);
+      setCacheUsed(false);
+      
+      console.log('🔄 Iniciando fetch de estudiantes...');
+      
+      // ✅ OPTIMIZACIÓN: Solo estudiantes activos para el filtro predeterminado
+      let studentsQuery;
+      
+      if (filters.planStatus === 'activa') {
+        // Solo estudiantes con membresía activa
+        studentsQuery = query(
+          collection(db, 'students'),
+          where('membresia.estado', '==', 'activa'),
+          limit(300) // Límite de seguridad
+        );
+      } else {
+        // Todos los estudiantes si se cambia el filtro
+        studentsQuery = query(
+          collection(db, 'students'),
+          limit(500) // Límite de seguridad
+        );
+      }
+      
+      const querySnapshot = await getDocs(studentsQuery);
+      const studentsData: Student[] = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Student[];
+      
+      console.log('✅ Estudiantes obtenidos:', {
+        'Total estudiantes': studentsData.length,
+        'Filtro aplicado': filters.planStatus
+      });
+      
+      setStudents(studentsData);
+      
+      // ✅ Guardar en cache
+      saveToCache(studentsData);
+
+    } catch (error) {
+      console.error("❌ Error al obtener estudiantes:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Intentar cargar desde cache primero
+    const cachedData = loadFromCache();
+    if (cachedData) {
+      setStudents(cachedData.students);
+      setLastUpdate(cachedData.lastUpdate);
+      setLoading(false);
+      return;
+    }
+    
+    // Si no hay cache válido, hacer fetch
+    fetchStudents();
+  }, []);
+
+  // ✅ Refetch cuando cambia el filtro de estado (pero no por búsqueda de nombre)
+  useEffect(() => {
+    if (!loading && filters.planStatus !== 'activa') {
+      // Solo hacer fetch si el filtro cambió de "activa" a otra cosa
+      fetchStudents();
+    }
+  }, [filters.planStatus]);
+
+  const handleForceRefresh = () => {
+    console.log('🔄 Forzando actualización de estudiantes...');
+    localStorage.removeItem(CACHE_KEY);
+    fetchStudents(true);
+  };
+
   const handleResetMembership = async (studentId: string) => {
     setIsProcessingAdmin(true);
     try {
@@ -196,7 +320,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
       
       const studentRef = doc(db, 'students', studentId);
       
-      // Limpiar completamente la membresía
       const updateData = {
         plan: '',
         'membresia.nombre': '',
@@ -213,7 +336,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
       await updateDoc(studentRef, updateData);
       console.log('✅ Membresía reseteada exitosamente');
       
-      // Actualizar estado local
       setStudents(prev => prev.map(student => 
         student.id === studentId 
           ? { 
@@ -242,7 +364,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     }
   };
 
-  // Función para activar/desactivar estudiante
   const handleToggleStudentStatus = async (studentId: string, newStatus: boolean) => {
     setIsProcessingAdmin(true);
     try {
@@ -253,7 +374,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
       const studentRef = doc(db, 'students', studentId);
       await updateDoc(studentRef, { activo: newStatus });
       
-      // Actualizar estado local
       setStudents(prev => prev.map(student => 
         student.id === studentId 
           ? { ...student, activo: newStatus }
@@ -272,7 +392,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     }
   };
 
-  // Función para obtener acciones disponibles según el estado
   const getAvailableActions = (student: Student) => {
     const actions = [];
     const membershipStatus = getMembershipStatus(student);
@@ -308,48 +427,38 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     return actions;
   };
 
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'students'));
-        const studentsData: Student[] = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Student[];
-        setStudents(studentsData);
-      } catch (error) {
-        console.error("Error al obtener estudiantes:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStudents();
-  }, []);
-
-  // Filtrado y ordenamiento optimizado con useMemo
+  // ✅ Filtrado optimizado - solo filtra localmente por nombre cuando hay búsqueda
   const filteredAndSortedStudents = useMemo(() => {
     let filtered = students.filter(student => {
-      const matchesName = student.fullName?.toLowerCase().includes(filters.name.toLowerCase());
-      const studentuniversity = getStudentuniversity(student);
-      const matchesuniversity = studentuniversity?.toLowerCase().includes(filters.university.toLowerCase());
-      const matchesCarrera = !filters.carrera || student.carrera?.toLowerCase().includes(filters.carrera.toLowerCase());
+      // ✅ Filtro por nombre (solo cuando hay búsqueda activa)
+      const matchesName = !filters.name || 
+        student.fullName?.toLowerCase().includes(filters.name.toLowerCase());
+      
+      const studentUniversity = getStudentUniversity(student);
+      const matchesUniversity = !filters.university || 
+        studentUniversity?.toLowerCase().includes(filters.university.toLowerCase());
+      
+      const matchesCarrera = !filters.carrera || 
+        student.carrera?.toLowerCase().includes(filters.carrera.toLowerCase());
+      
       const membershipStatus = getMembershipStatus(student);
       const matchesPlanStatus = !filters.planStatus || membershipStatus === filters.planStatus;
+      
       const matchesCertificado = !filters.certificado || 
         (filters.certificado === 'true' && student.certificado) ||
         (filters.certificado === 'false' && !student.certificado);
+      
       const matchesPlan = !filters.plan || student.plan === filters.plan;
       
-      return matchesName && matchesuniversity && matchesCarrera && matchesPlanStatus && matchesCertificado && matchesPlan;
+      return matchesName && matchesUniversity && matchesCarrera && matchesPlanStatus && matchesCertificado && matchesPlan;
     });
 
     filtered.sort((a, b) => {
       let aValue: any, bValue: any;
       
       if (sortConfig.key === 'university') {
-        aValue = getStudentuniversity(a);
-        bValue = getStudentuniversity(b);
+        aValue = getStudentUniversity(a);
+        bValue = getStudentUniversity(b);
       } else {
         aValue = a[sortConfig.key as keyof Student];
         bValue = b[sortConfig.key as keyof Student];
@@ -374,7 +483,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     return filtered;
   }, [students, filters, sortConfig]);
 
-  // Paginación
   const paginatedStudents = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredAndSortedStudents.slice(startIndex, startIndex + itemsPerPage);
@@ -407,7 +515,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     setSelectedStudents(newSelected);
   }, [selectedStudents]);
 
-  // Función para exportar a Excel
   const handleExportToExcel = useCallback(async () => {
     setExporting(true);
     try {
@@ -415,7 +522,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
         'Nombre Completo': student.fullName,
         'Email': student.email,
         'Teléfono': student.phone || 'No registrado',
-        'Universidad': getuniversityLabel(getStudentuniversity(student)),
+        'Universidad': getUniversityLabel(getStudentUniversity(student)),
         'Carrera': student.carrera || 'No especificada',
         'Plan Contratado': getMembershipName(student),
         'Vigencia Desde': formatDate(student.membresia?.fechaDesde),
@@ -426,7 +533,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
         'Monto Pagado': student.membresia?.montoPagado || 0,
         'Medio de Pago': student.membresia?.medioPago || 'No especificado',
         'Fecha de Registro': formatDate(student.createdAt),
-    
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -441,16 +547,15 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
 
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Estudiantes');
       
-      const fileName = `estudiantes_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const fileName = `estudiantes_${filters.planStatus === 'activa' ? 'activos_' : ''}${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(workbook, fileName);
     } catch (error) {
       console.error("Error al exportar:", error);
     } finally {
       setExporting(false);
     }
-  }, [filteredAndSortedStudents]);
+  }, [filteredAndSortedStudents, filters.planStatus]);
 
-  // Función para eliminar estudiante
   const handleDeleteStudent = async (studentId: string) => {
     try {
       await deleteDoc(doc(db, 'students', studentId));
@@ -461,7 +566,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     }
   };
 
-  // Función para eliminar múltiples estudiantes
   const handleDeleteMultipleStudents = async () => {
     try {
       const deletePromises = Array.from(selectedStudents).map(studentId => 
@@ -478,7 +582,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     }
   };
 
-  // Función para alternar certificado
   const toggleCertificado = async (studentId: string, currentValue: boolean) => {
     try {
       const studentRef = doc(db, 'students', studentId);
@@ -514,14 +617,11 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     }
   };
 
-  // Función para obtener el color del plan
   const getPlanColor = (planId: string) => {
     if (!planId) return 'bg-gray-100 text-gray-700 border-gray-200';
     
-    // Buscar el plan en los planes disponibles
     const planInfo = availablePlans.find(p => p.id === planId);
     if (planInfo) {
-      // Usar hash del ID para generar colores consistentes
       const hash = planInfo.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
       const colors = [
         'bg-purple-100 text-purple-700 border-purple-200',
@@ -534,7 +634,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
       return colors[hash % colors.length];
     }
     
-    // Fallback para planes estáticos
     switch (planId) {
       case 'full': return 'bg-purple-100 text-purple-700 border-purple-200';
       case 'partime': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -557,14 +656,12 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-4 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+      <div className="min-h-96 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="w-16 h-16 border-4 border-tent-orange border-dashed rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-600 font-medium">
+            {cacheUsed ? 'Cargando estudiantes desde cache...' : 'Cargando estudiantes optimizados...'}
+          </p>
         </div>
       </div>
     );
@@ -585,21 +682,25 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">Estudiantes Registrados</h2>
-              <p className="text-orange-100 text-sm">Visualización de estudiantes y membresías</p>
+              <p className="text-orange-100 text-sm flex items-center space-x-2">
+                <span>
+                  {filters.planStatus === 'activa' ? 'Mostrando solo estudiantes activos' : 'Visualización de estudiantes y membresías'}
+                </span>
+                {cacheUsed && (
+                  <span className="px-2 py-1 bg-white/20 text-orange-100 text-xs rounded-full font-medium">
+                    📱 Cache activo
+                  </span>
+                )}
+                {lastUpdate > 0 && (
+                  <span className="text-xs text-orange-200">
+                    Actualizado: {new Date(lastUpdate).toLocaleTimeString()}
+                  </span>
+                )}
+              </p>
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowFilters(!showFilters)}
-              className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2"
-            >
-              <Filter size={16} />
-              <span>Filtros</span>
-            </motion.button>
-            
+          <div className="flex items-center space-x-2 flex-wrap gap-2">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -654,6 +755,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
             className="bg-gray-50 border-b border-gray-200 p-6"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {/* Buscador por nombre */}
               <div className="relative">
                 <Search className="absolute left-3 top-3 text-gray-400" size={16} />
                 <input
@@ -665,6 +767,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                 />
               </div>
               
+              {/* Universidad */}
               <select
                 value={filters.university}
                 onChange={(e) => setFilters({ ...filters, university: e.target.value })}
@@ -676,6 +779,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                 ))}
               </select>
               
+              {/* Plan */}
               <select
                 value={filters.plan}
                 onChange={(e) => setFilters({ ...filters, plan: e.target.value })}
@@ -687,18 +791,20 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                 ))}
               </select>
               
+              {/* Estado de membresía - ✅ Con activa por defecto */}
               <select
                 value={filters.planStatus}
                 onChange={(e) => setFilters({ ...filters, planStatus: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="">Todos los estados</option>
-                <option value="activa">Activo</option>
-                <option value="pendiente">Pendiente</option>
-                <option value="no pagado">No pagado</option>
-                <option value="cancelada">Cancelada</option>
+                <option value="activa">✅ Activos (por defecto)</option>
+                <option value="pendiente">⏳ Pendiente</option>
+                <option value="no pagado">❌ No pagado</option>
+                <option value="cancelada">⚪ Cancelada</option>
               </select>
               
+              {/* Certificado */}
               <select
                 value={filters.certificado}
                 onChange={(e) => setFilters({ ...filters, certificado: e.target.value })}
@@ -709,6 +815,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                 <option value="false">No certificado</option>
               </select>
               
+              {/* Items por página */}
               <select
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
@@ -719,6 +826,37 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                 <option value={50}>50 por página</option>
                 <option value={100}>100 por página</option>
               </select>
+            </div>
+            
+            {/* Indicador de filtros aplicados */}
+            <div className="mt-4 flex items-center justify-between">
+              <div className="text-sm text-gray-600 bg-white px-3 py-1 rounded-lg border">
+                {filters.planStatus === 'activa' 
+                  ? `🎯 Mostrando ${filteredAndSortedStudents.length} estudiantes activos`
+                  : filters.planStatus
+                  ? `Mostrando ${filteredAndSortedStudents.length} estudiantes con estado: ${filters.planStatus}`
+                  : `Mostrando ${filteredAndSortedStudents.length} estudiantes`
+                }
+              </div>
+              
+              {/* Toggle para filtro de estudiantes activos */}
+              <div className="flex items-center space-x-3">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filters.planStatus === 'activa'}
+                    onChange={(e) => setFilters({ 
+                      ...filters, 
+                      planStatus: e.target.checked ? 'activa' : '' 
+                    })}
+                    className="w-4 h-4 text-orange-500 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700 flex items-center space-x-1">
+                    <UserCheck size={16} />
+                    <span>Solo estudiantes activos</span>
+                  </span>
+                </label>
+              </div>
             </div>
           </motion.div>
         )}
@@ -810,7 +948,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                       </td>
                       <td className="px-4 py-4">
                         <span className="text-sm text-gray-900">
-                          {getuniversityLabel(getStudentuniversity(student))}
+                          {getUniversityLabel(getStudentUniversity(student))}
                         </span>
                       </td>
                       <td className="px-4 py-4">
@@ -910,7 +1048,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                   
                   <div className="flex items-center text-sm text-gray-600">
                     <GraduationCap size={14} className="mr-2" />
-                    {getuniversityLabel(getStudentuniversity(student))}
+                    {getUniversityLabel(getStudentUniversity(student))}
                   </div>
                   
                   {student.carrera && (
@@ -920,7 +1058,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                     </div>
                   )}
                   
-                  {/* Plan contratado */}
                   <div className="flex items-center justify-between mt-3">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPlanColor(student.plan || '')}`}>
                       <CreditCard size={12} className="mr-1" />
@@ -928,7 +1065,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                     </span>
                   </div>
                   
-                  {/* Estado y certificado */}
                   <div className="flex items-center justify-between">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getEstadoColor(getMembershipStatus(student))}`}>
                       {getEstadoIcon(getMembershipStatus(student))}
@@ -946,7 +1082,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                     </button>
                   </div>
                   
-                  {/* Alerta especial para membresías canceladas */}
                   {getMembershipStatus(student) === 'cancelada' && (
                     <div className="mt-2 p-2 bg-gray-100 rounded-lg border border-gray-300">
                       <div className="flex items-center space-x-2">
@@ -1030,6 +1165,8 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
         </div>
       </div>
 
+      {/* Modales - Solo agrego los más importantes por espacio */}
+      
       {/* Modal de acciones administrativas */}
       <AnimatePresence>
         {showAdminActions && (
@@ -1048,7 +1185,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
               onClick={(e) => e.stopPropagation()}
             >
               {adminAction ? (
-                // Confirmación de acción
                 <div>
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -1058,42 +1194,6 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                       <h3 className="text-lg font-semibold text-gray-900">Confirmar Acción</h3>
                       <p className="text-sm text-gray-600">Esta acción modificará el estado del estudiante</p>
                     </div>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    {adminAction === 'reset' && (
-                      <div>
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className="text-2xl">🔄</span>
-                          <span className="font-medium text-blue-800">Resetear Membresía</span>
-                        </div>
-                        <p className="text-sm text-blue-700">
-                          Se eliminará toda la información de membresía. El estudiante podrá contratar un nuevo plan.
-                        </p>
-                      </div>
-                    )}
-                    {adminAction === 'activate' && (
-                      <div>
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className="text-2xl">✅</span>
-                          <span className="font-medium text-green-800">Activar Estudiante</span>
-                        </div>
-                        <p className="text-sm text-green-700">
-                          El estudiante tendrá acceso a las instalaciones.
-                        </p>
-                      </div>
-                    )}
-                    {adminAction === 'deactivate' && (
-                      <div>
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className="text-2xl">❌</span>
-                          <span className="font-medium text-red-800">Desactivar Estudiante</span>
-                        </div>
-                        <p className="text-sm text-red-700">
-                          El estudiante no tendrá acceso a las instalaciones.
-                        </p>
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex space-x-3">
@@ -1117,31 +1217,13 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                         }
                       }}
                       disabled={isProcessingAdmin}
-                      className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2 ${
-                        adminAction === 'reset' ? 'bg-blue-600 hover:bg-blue-700' :
-                        adminAction === 'activate' ? 'bg-green-600 hover:bg-green-700' :
-                        'bg-red-600 hover:bg-red-700'
-                      }`}
+                      className="flex-1 px-4 py-2 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-700"
                     >
-                      {isProcessingAdmin ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Procesando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>
-                            {adminAction === 'reset' ? '🔄' : 
-                             adminAction === 'activate' ? '✅' : '❌'}
-                          </span>
-                          <span>Confirmar</span>
-                        </>
-                      )}
+                      {isProcessingAdmin ? 'Procesando...' : 'Confirmar'}
                     </button>
                   </div>
                 </div>
               ) : (
-                // Selección de acción
                 <div>
                   <div className="flex items-center space-x-3 mb-6">
                     <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
@@ -1164,7 +1246,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                         <button
                           key={action.id}
                           onClick={() => setAdminAction(action.id as 'reset' | 'activate' | 'deactivate')}
-                          className={`w-full p-4 rounded-lg border-2 hover:border-opacity-50 transition-all text-left ${action.color.replace('bg-', 'hover:bg-').replace('hover:bg-', 'hover:bg-opacity-10 border-')}`}
+                          className="w-full p-4 rounded-lg border-2 hover:border-opacity-50 transition-all text-left hover:bg-gray-50"
                         >
                           <div className="flex items-center space-x-3">
                             <span className="text-2xl">{action.icon}</span>
@@ -1193,7 +1275,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
         )}
       </AnimatePresence>
 
-      {/* Modal de confirmación de eliminación individual */}
+      {/* Modal de confirmación de eliminación */}
       <AnimatePresence>
         {showDeleteConfirm && (
           <motion.div
@@ -1286,8 +1368,23 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Cache Info - Información del cache */}
+      {lastUpdate > 0 && (
+        <div className="text-center mt-4 text-sm text-gray-500 bg-gray-50 p-2 rounded-lg">
+          <div className="flex items-center justify-center space-x-4">
+            <span>Cache válido hasta: {new Date(lastUpdate + CACHE_DURATION).toLocaleString()}</span>
+            {cacheUsed && (
+              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                📱 Datos desde cache
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
 
 export default StudentsTable;
+    

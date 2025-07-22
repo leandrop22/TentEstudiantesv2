@@ -16,6 +16,6 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "src/services/auth.ts", "src/services/authService.ts", "src/services/checkInService.ts", "src/services/firestore.ts", "src/utils/firebase.ts"],
+  "include": ["src", "src/services/auth.ts", "src/services/authService.ts", "src/services/checkInService.ts", "src/services/firestore.ts", "src/utils/firebase.ts", "vite-env.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

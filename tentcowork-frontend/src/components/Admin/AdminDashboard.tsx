@@ -14,11 +14,12 @@ import {
   Clock,
   CreditCard,
   Banknote,
-  Building
+  Building,
+  RefreshCw
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../utils/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, orderBy, getCountFromServer } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import { Plan } from '../../types/Plan';
 
@@ -48,7 +49,13 @@ interface DashboardMetrics {
     total: number;
     masUsado: string;
   };
+  lastUpdate: number;
+  cacheExpiry: number;
 }
+
+// ✅ CLAVE: Cache del navegador con expiración
+const CACHE_KEY = 'adminDashboardMetrics';
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutos
 
 const AdminDashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -76,58 +83,184 @@ const AdminDashboard: React.FC = () => {
     plans: {
       total: 0,
       masUsado: ''
-    }
+    },
+    lastUpdate: 0,
+    cacheExpiry: 0
   });
+  
   const [loading, setLoading] = useState(true);
+  const [cacheUsed, setCacheUsed] = useState(false);
   const navigate = useNavigate();
 
-  // Definir todos los medios de pago disponibles
   const paymentMethods = ['Efectivo', 'Mercado Pago Transferencia', 'Mercado Pago Posnet', 'Mercado Pago Hospedado'];
 
+  // ✅ Cache del navegador - Cargar datos en caché
+  const loadFromCache = (): DashboardMetrics | null => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const data = JSON.parse(cached);
+        const now = Date.now();
+        
+        console.log('🔍 Verificando cache:', {
+          'Cache timestamp': new Date(data.lastUpdate).toLocaleString(),
+          'Current time': new Date(now).toLocaleString(),
+          'Cache valid': now < data.cacheExpiry
+        });
+        
+        if (now < data.cacheExpiry) {
+          console.log('✅ Usando datos desde cache');
+          setCacheUsed(true);
+          return data;
+        } else {
+          console.log('⏰ Cache expirado, eliminando...');
+          localStorage.removeItem(CACHE_KEY);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error leyendo cache:', error);
+      localStorage.removeItem(CACHE_KEY);
+    }
+    return null;
+  };
+
+  // ✅ Cache del navegador - Guardar datos en caché
+  const saveToCache = (data: DashboardMetrics) => {
+    try {
+      const now = Date.now();
+      const dataToCache = {
+        ...data,
+        lastUpdate: now,
+        cacheExpiry: now + CACHE_DURATION
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
+      console.log('💾 Datos guardados en cache hasta:', new Date(dataToCache.cacheExpiry).toLocaleString());
+    } catch (error) {
+      console.error('❌ Error guardando cache:', error);
+    }
+  };
+
   useEffect(() => {
+    // Intentar cargar desde cache primero
+    const cachedData = loadFromCache();
+    if (cachedData) {
+      setMetrics(cachedData);
+      setLoading(false);
+      return;
+    }
+    
+    // Si no hay cache válido, hacer fetch
     fetchMetrics();
   }, []);
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = async (forceRefresh = false) => {
     try {
       setLoading(true);
+      setCacheUsed(false);
       
-      // Obtener todos los datos necesarios
-      const [studentsSnapshot, sessionsSnapshot, paymentsSnapshot, plansSnapshot] = await Promise.all([
-        getDocs(collection(db, 'students')),
-        getDocs(collection(db, 'sessions')),
-        getDocs(collection(db, 'payments')),
+      console.log('🔄 Iniciando fetch de métricas...');
+      
+      // ✅ OPTIMIZACIÓN 1: Solo estudiantes activos + conteo total
+      const [
+        activeStudentsSnapshot,
+        totalStudentsCount,
+        recentSessionsSnapshot,
+        recentPaymentsSnapshot,
+        plansSnapshot
+      ] = await Promise.all([
+        // Solo estudiantes activos para procesar datos detallados
+        getDocs(query(
+          collection(db, 'students'),
+          where('membresia.estado', '==', 'activa'),
+          limit(100) // Límite de seguridad
+        )),
+        
+        // ✅ OPTIMIZACIÓN 2: Conteo total sin traer todos los docs
+        getCountFromServer(collection(db, 'students')),
+        
+        // ✅ Solo sesiones recientes (últimos 30 días)
+        getDocs(query(
+          collection(db, 'sessions'),
+          where('checkInTimestamp', '>=', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
+          limit(200)
+        )),
+        
+        // ✅ Solo pagos recientes (últimos 30 días)
+        getDocs(query(
+          collection(db, 'payments'),
+          where('date', '>=', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+          limit(200)
+        )),
+        
+        // Planes (pocos, no necesita optimización)
         getDocs(collection(db, 'plans'))
       ]);
 
-      // Procesar estudiantes
-      const students = studentsSnapshot.docs.map(doc => doc.data());
+      console.log('✅ Datos obtenidos:', {
+        'Estudiantes activos': activeStudentsSnapshot.size,
+        'Total estudiantes': totalStudentsCount.data().count,
+        'Sesiones recientes': recentSessionsSnapshot.size,
+        'Pagos recientes': recentPaymentsSnapshot.size,
+        'Planes': plansSnapshot.size
+      });
+
+      // ✅ OPTIMIZACIÓN 3: Obtener conteos adicionales de forma eficiente
+      const [pendingStudentsCount, unpaidStudentsCount] = await Promise.all([
+        getCountFromServer(query(
+          collection(db, 'students'),
+          where('membresia.estado', '==', 'pendiente')
+        )),
+        getCountFromServer(query(
+          collection(db, 'students'),
+          where('membresia.estado', '==', 'inactiva')
+        ))
+      ]);
+
+      // Procesar datos
+      const activeStudents = activeStudentsSnapshot.docs.map(doc => doc.data());
       const plans = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Plan[];
       
-      const studentMetrics = processStudentMetrics(students, plans);
-      const sessionMetrics = processSessionMetrics(sessionsSnapshot.docs.map(doc => doc.data()));
-      const paymentMetrics = processPaymentMetrics(paymentsSnapshot.docs.map(doc => doc.data()));
-      const planMetrics = processPlanMetrics(plans, students);
+      const studentMetrics = processStudentMetrics(
+        activeStudents, 
+        plans, 
+        totalStudentsCount.data().count,
+        pendingStudentsCount.data().count,
+        unpaidStudentsCount.data().count
+      );
+      
+      const sessionMetrics = processSessionMetrics(recentSessionsSnapshot.docs.map(doc => doc.data()));
+      const paymentMetrics = processPaymentMetrics(recentPaymentsSnapshot.docs.map(doc => doc.data()));
+      const planMetrics = processPlanMetrics(plans, activeStudents);
 
-      setMetrics({
+      const newMetrics = {
         students: studentMetrics,
         sessions: sessionMetrics,
         payments: paymentMetrics,
-        plans: planMetrics
-      });
+        plans: planMetrics,
+        lastUpdate: Date.now(),
+        cacheExpiry: Date.now() + CACHE_DURATION
+      };
+
+      setMetrics(newMetrics);
+      
+      // ✅ Guardar en cache
+      saveToCache(newMetrics);
 
     } catch (error) {
-      console.error('Error fetching metrics:', error);
+      console.error('❌ Error fetching metrics:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const processStudentMetrics = (students: any[], plans: Plan[]) => {
-    const total = students.length;
-    let activos = 0;
-    let pendientes = 0;
-    let noPagados = 0;
+  // ✅ Procesar métricas de estudiantes con datos limitados
+  const processStudentMetrics = (
+    activeStudents: any[], 
+    plans: Plan[], 
+    totalCount: number,
+    pendingCount: number,
+    unpaidCount: number
+  ) => {
     let alumnosRegulares = 0;
     let presentados = 0;
     let noPresentados = 0;
@@ -138,25 +271,16 @@ const AdminDashboard: React.FC = () => {
       planDistribution[plan.name] = 0;
     });
 
-    students.forEach(student => {
-      // Estados de membresía
-      const estado = student.membresia?.estado;
-      if (estado === 'activa') activos++;
-      else if (estado === 'pendiente') pendientes++;
-      else noPagados++;
-
-      // Tipos de estudiante (certificado) - corregir lectura del campo
+    // Solo procesar estudiantes activos
+    activeStudents.forEach(student => {
+      // Tipos de estudiante (certificado)
       const certificado = student.certificado;
-            
-      if (certificado == true ) {
+      
+      if (certificado === true) {
         alumnosRegulares++;
-        presentados++; // Los alumnos regulares son "presentados" (certificados)
-        
-      } else if (certificado == null || false ) {
-        noPresentados++; // Los no certificados son "no presentados"
-        
-      } else {
-        console.log('❓ Tipo no reconocido:', certificado);
+        presentados++;
+      } else if (certificado === null || certificado === false) {
+        noPresentados++;
       }
 
       // Distribución de planes
@@ -167,10 +291,10 @@ const AdminDashboard: React.FC = () => {
     });
 
     return {
-      total,
-      activos,
-      pendientes,
-      noPagados,
+      total: totalCount,
+      activos: activeStudents.length,
+      pendientes: pendingCount,
+      noPagados: unpaidCount,
       alumnosRegulares,
       presentados,
       noPresentados,
@@ -182,10 +306,8 @@ const AdminDashboard: React.FC = () => {
     const total = sessions.length;
     const hoy = new Date().toDateString();
     
-    // Sesiones activas (sin checkOut)
     const enCowork = sessions.filter(session => !session.checkOutTimestamp).length;
     
-    // Sesiones de hoy
     const hoyCount = sessions.filter(session => {
       if (session.checkInTimestamp) {
         const sessionDate = session.checkInTimestamp.toDate ? 
@@ -205,41 +327,28 @@ const AdminDashboard: React.FC = () => {
 
   const processPaymentMetrics = (payments: any[]) => {
     const total = payments.length;
-    const hoy = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
+    const hoy = new Date().toISOString().split('T')[0];
     
     let hoyTotal = 0;
     let pendientes = 0;
     
-    // Inicializar todos los medios de pago con 0
     const mediosPago: { [medio: string]: number } = {};
     paymentMethods.forEach(method => {
       mediosPago[method] = 0;
     });
 
-    payments.forEach((payment, index) => {
-      console.log(`🔍 Pago ${index + 1}:`, payment);
-      
-      // ✅ CORREGIDO: Pagos de hoy usando el campo correcto 'date' en formato YYYY-MM-DD
-      if (payment.date) {
-        console.log(`📅 Comparando fecha del pago: "${payment.date}" con hoy: "${hoy}"`);
-        if (payment.date === hoy) {
-          // ✅ CORREGIDO: Usar 'amount' en lugar de 'monto'
-          const amount = payment.amount || payment.monto || 0;
-          hoyTotal += amount;
-          console.log(`💰 Pago de hoy encontrado: $${amount}`);
-        }
+    payments.forEach((payment) => {      
+      if (payment.date && payment.date === hoy) {
+        const amount = payment.amount || payment.monto || 0;
+        hoyTotal += amount;
       }
 
-      // ✅ CORREGIDO: Verificar pagos pendientes usando el campo 'facturado'
-      // Si no está facturado, considerarlo como pendiente
       if (payment.facturado === false || payment.estado === 'pendiente') {
         pendientes++;
-        console.log(`⏳ Pago pendiente encontrado`);
       }
 
-      // Medios de pago - usar múltiples campos posibles
       const posiblesCampos = [
-        payment.method,         // ✅ Campo principal en PaymentsTable
+        payment.method,
         payment.medioPago,
         payment.medoPago, 
         payment.metodo,
@@ -248,33 +357,17 @@ const AdminDashboard: React.FC = () => {
         payment.medio
       ];
 
-      console.log(`🔍 Campos posibles para pago ${index + 1}:`, posiblesCampos);
-
-      // Usar el primer campo que no sea undefined/null
       let medio = posiblesCampos.find(campo => campo != null) || 'Efectivo';
       
-      console.log(`✅ Medio seleccionado para pago ${index + 1}:`, medio);
-
-      // Si el medio de pago existe en nuestros métodos definidos, incrementar
       if (mediosPago.hasOwnProperty(medio)) {
         mediosPago[medio]++;
-        console.log('✅ Medio encontrado y contado:', medio);
       } else {
-        // Si no existe, agregarlo como método no reconocido
-        console.log('❌ Medio no reconocido:', medio);
-        // Crear una entrada para "Otros" si no existe
         if (!mediosPago['Otros']) {
           mediosPago['Otros'] = 0;
         }
         mediosPago['Otros']++;
       }
     });
-
-    console.log(`💰 RESUMEN DE PAGOS:`);
-    console.log(`   Total pagos: ${total}`);
-    console.log(`   Pagos de hoy: $${hoyTotal}`);
-    console.log(`   Pagos pendientes: ${pendientes}`);
-    console.log(`   Medios de pago:`, mediosPago);
 
     return {
       total,
@@ -284,12 +377,11 @@ const AdminDashboard: React.FC = () => {
     };
   };
 
-  const processPlanMetrics = (plans: Plan[], students: any[]) => {
+  const processPlanMetrics = (plans: Plan[], activeStudents: any[]) => {
     const total = plans.length;
     
-    // Encontrar el plan más usado
     const planUsage: { [planName: string]: number } = {};
-    students.forEach(student => {
+    activeStudents.forEach(student => {
       const planName = student.plan || student.membresia?.nombre;
       if (planName) {
         planUsage[planName] = (planUsage[planName] || 0) + 1;
@@ -308,11 +400,19 @@ const AdminDashboard: React.FC = () => {
 
   const handleLogout = async () => {
     try {
+      // Limpiar cache al hacer logout
+      localStorage.removeItem(CACHE_KEY);
       await signOut(auth);
       navigate('/login');
     } catch (error) {
       console.error("Error logging out: ", error);
     }
+  };
+
+  const handleForceRefresh = () => {
+    console.log('🔄 Forzando actualización...');
+    localStorage.removeItem(CACHE_KEY);
+    fetchMetrics(true);
   };
 
   const DashboardCard: React.FC<{
@@ -354,7 +454,6 @@ const AdminDashboard: React.FC = () => {
       </div>
     );
 
-  // Función helper para obtener el ícono correcto según el medio de pago
   const getPaymentMethodIcon = (medio: string) => {
     if (medio === 'Efectivo') {
       return <Banknote size={14} />;
@@ -367,7 +466,9 @@ const AdminDashboard: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
         <div className="flex flex-col items-center">
           <div className="w-16 h-16 border-4 border-tent-orange border-dashed rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600 font-medium">Cargando métricas...</p>
+          <p className="text-gray-600 font-medium">
+            {cacheUsed ? 'Cargando desde cache...' : 'Cargando métricas optimizadas...'}
+          </p>
         </div>
       </div>
     );
@@ -384,7 +485,19 @@ const AdminDashboard: React.FC = () => {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold text-gray-800 mb-2">Panel de Administración</h1>
-            <p className="text-gray-600">Vista general del coworking</p>
+            <p className="text-gray-600 flex items-center space-x-2">
+              <span>Vista general del coworking</span>
+              {cacheUsed && (
+                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                  📱 Cache activo
+                </span>
+              )}
+              {metrics.lastUpdate > 0 && (
+                <span className="text-xs text-gray-500">
+                  Actualizado: {new Date(metrics.lastUpdate).toLocaleTimeString()}
+                </span>
+              )}
+            </p>
           </div>
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -403,7 +516,7 @@ const AdminDashboard: React.FC = () => {
           <DashboardCard
             title="Estudiantes"
             icon={<Users className="text-white" size={24} />}
-            onClick={() => navigate('/admin/students')}
+            onClick={() => navigate('students')}
             gradient="bg-gradient-to-br from-blue-500 to-blue-600"
           >
             <MetricItem label="Total" value={metrics.students.total} />
@@ -438,7 +551,7 @@ const AdminDashboard: React.FC = () => {
           <DashboardCard
             title="Sesiones"
             icon={<Activity className="text-white" size={24} />}
-            onClick={() => navigate('/admin/sessions')}
+            onClick={() => navigate('sessions')}
             gradient="bg-gradient-to-br from-green-500 to-green-600"
           >
             <MetricItem label="Total" value={metrics.sessions.total} />
@@ -458,7 +571,7 @@ const AdminDashboard: React.FC = () => {
           <DashboardCard
             title="Pagos"
             icon={<DollarSign className="text-white" size={24} />}
-            onClick={() => navigate('/admin/payments')}
+            onClick={() => navigate('payments')}
             gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
           >
             <MetricItem label="Total" value={metrics.payments.total} />
@@ -488,7 +601,7 @@ const AdminDashboard: React.FC = () => {
           <DashboardCard
             title="Planes"
             icon={<Calendar className="text-white" size={24} />}
-            onClick={() => navigate('/admin/plans')}
+            onClick={() => navigate('plans')}
             gradient="bg-gradient-to-br from-orange-500 to-orange-600"
           >
             <MetricItem label="Total" value={metrics.plans.total} />
@@ -499,7 +612,7 @@ const AdminDashboard: React.FC = () => {
           <DashboardCard
             title="Estadísticas"
             icon={<BarChart3 className="text-white" size={24} />}
-            onClick={() => navigate('/admin/stats')}
+            onClick={() => navigate('stats')}
             gradient="bg-gradient-to-br from-purple-500 to-purple-600"
           >
             <MetricItem label="Ver reportes" value="detallados" />
@@ -508,16 +621,34 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Refresh Button */}
-        <div className="flex justify-center mt-8">
+        <div className="flex justify-center mt-8 space-x-4">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={fetchMetrics}
-            className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium transition-all duration-200"
+            onClick={() => fetchMetrics()}
+            className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2"
           >
-            Actualizar métricas
+            <RefreshCw size={16} />
+            <span>Actualizar (desde cache si es posible)</span>
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleForceRefresh}
+            className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium transition-all duration-200 flex items-center space-x-2"
+          >
+            <RefreshCw size={16} />
+            <span>Forzar actualización</span>
           </motion.button>
         </div>
+
+        {/* Cache Info */}
+        {metrics.lastUpdate > 0 && (
+          <div className="text-center mt-4 text-sm text-gray-500">
+            Cache válido hasta: {new Date(metrics.cacheExpiry).toLocaleString()}
+          </div>
+        )}
       </motion.div>
     </div>
   );
