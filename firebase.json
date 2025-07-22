@@ -1,7 +1,7 @@
 {
   "functions": [
     {
-      "source": "tentcowork-backend/functions", 
+      "source": "functions", 
       "codebase": "default",
       "runtime": "nodejs22",
       "ignore": [
