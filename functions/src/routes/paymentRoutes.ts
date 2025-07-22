@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import { PaymentController } from '../controllers/paymentController';
 
-const router = Router();
+export const router = Router();
 
 // 🎯 RUTAS DE WEBHOOK
 router.post('/webhook/mercadopago', PaymentController.handleMercadoPagoWebhook);
