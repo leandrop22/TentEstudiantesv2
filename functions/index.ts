@@ -6,10 +6,10 @@ import * as admin from 'firebase-admin'; // 👈 ¡IMPORTANTE! Si usas Admin SDK
 
 dotenv.config();
 
-import adminRoutes from './routes/adminRoutes';
-import paymentRoutes from './routes/paymentRoutes';
+import adminRoutes from './src/routes/adminRoutes';
+import paymentRoutes from './src/routes/paymentRoutes';
 
-import { initializeMercadoPago } from './controllers/paymentController';
+import { initializeMercadoPago } from './src/controllers/paymentController';
 
 const app = express();
 
