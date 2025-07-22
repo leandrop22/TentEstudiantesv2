@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import * as functions from 'firebase-functions'; // 👈 ¡IMPORTANTE!
-import * as admin from 'firebase-admin'; // 👈 ¡IMPORTANTE! Si usas Admin SDK
+
 
 dotenv.config();
 

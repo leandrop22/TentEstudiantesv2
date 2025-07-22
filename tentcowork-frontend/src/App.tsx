@@ -10,7 +10,7 @@ import AdminLayout from './components/Admin/AdminLayout';
 
 function App() {
   return (
-     <BrowserRouter>
+    
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -21,7 +21,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
         </Routes>
       </AuthProvider>
-    </BrowserRouter>
+   
   );
 }
 
