@@ -9,13 +9,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # Paso para configurar Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
       
-      # ✅ PASO CORREGIDO: Agregar variables de entorno
+      - name: Debug Environment Variables
+        run: |
+          echo "API_KEY exists: ${{ secrets.VITE_FIREBASE_API_KEY != '' }}"
+          echo "PROJECT_ID exists: ${{ secrets.VITE_FIREBASE_PROJECT_ID != '' }}"
+          echo "AUTH_DOMAIN exists: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN != '' }}"
+      
       - name: Install Frontend Dependencies and Build
         working-directory: ./tentcowork-frontend
         env:

@@ -4,6 +4,15 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
+
+
+console.log('🔍 Firebase Environment Check:', {
+  'VITE_FIREBASE_API_KEY': import.meta.env.VITE_FIREBASE_API_KEY ? '✅ EXISTS' : '❌ MISSING',
+  'VITE_FIREBASE_PROJECT_ID': import.meta.env.VITE_FIREBASE_PROJECT_ID ? '✅ EXISTS' : '❌ MISSING',
+  'VITE_FIREBASE_AUTH_DOMAIN': import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? '✅ EXISTS' : '❌ MISSING',
+  'PROJECT_ID_VALUE': import.meta.env.VITE_FIREBASE_PROJECT_ID
+});
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
