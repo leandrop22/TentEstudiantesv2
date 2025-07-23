@@ -1010,11 +1010,11 @@ const PaymentsTable: React.FC = () => {
                               </button>
                                {isSuperAdmin && (
                               <button
-                                onClick={() => setShowDeleteConfirm(payment.id)}
-                                className="text-red-500 hover:text-red-600 transition-colors p-1 rounded"
-                                title="Eliminar pago (Solo Super-Admin)"
+                                //onClick={() => setShowDeleteConfirm(payment.id)}
+                              //  className="text-red-500 hover:text-red-600 transition-colors p-1 rounded"
+                               // title="Eliminar pago (Solo Super-Admin)"
                               >
-                                <Trash2 size={16} />
+                              <Trash2 size={16} />
                               </button>
                               )}
                             </>
