@@ -10,6 +10,7 @@ import {
   checkStudentStatus,
   recoverCodeByEmail
 } from '../../services/checkInService';
+import { useNavigate } from 'react-router-dom';
 
 interface Student {
   fullName?: string;
@@ -84,6 +85,15 @@ const NumericKeypad: React.FC<NumericKeypadProps> = ({ onKeyPress, onDelete, onS
 };
 
 export const CheckInForm = () => {
+  const navigate = useNavigate();
+
+  // Proteger la ruta: solo admins logueados pueden acceder
+  useEffect(() => {
+    const isAdmin = localStorage.getItem('isAdmin') === 'true';
+    if (!isAdmin) {
+      navigate('/login');
+    }
+  }, [navigate]);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CheckInResult | null>(null);
