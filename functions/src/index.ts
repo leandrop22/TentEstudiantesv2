@@ -36,10 +36,10 @@ app.use('/api', paymentRoutes);
 
 // ✅ Solo para desarrollo local
 if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 3001;
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📡 API available at http://localhost:${PORT}/api`);
+  const APP_PORT = process.env.APP_PORT || 3001;
+  app.listen(APP_PORT, () => {
+    console.log(`🚀 Server running on port ${APP_PORT}`);
+    console.log(`📡 API available at http://localhost:${APP_PORT}/api`);
   });
 }
 
