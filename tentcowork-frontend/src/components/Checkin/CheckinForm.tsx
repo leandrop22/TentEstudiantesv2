@@ -4,13 +4,15 @@ import {
   User, CheckCircle, XCircle,
   ArrowRight, Delete, Mail, Users, AlertTriangle, Timer, Clock
 } from 'lucide-react';
-import { Timestamp } from 'firebase/firestore';
+import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import {
   checkInOrOut,
   checkStudentStatus,
   recoverCodeByEmail
 } from '../../services/checkInService';
 import { useNavigate } from 'react-router-dom';
+import { auth, db } from '../../utils/firebase';
+import { signOut } from 'firebase/auth';
 
 interface Student {
   fullName?: string;
@@ -85,15 +87,8 @@ const NumericKeypad: React.FC<NumericKeypadProps> = ({ onKeyPress, onDelete, onS
 };
 
 export const CheckInForm = () => {
+  const [user, setUser] = useState<any>(null);
   const navigate = useNavigate();
-
-  // Proteger la ruta: solo admins logueados pueden acceder
-  useEffect(() => {
-    const isAdmin = localStorage.getItem('isAdmin') === 'true';
-    if (!isAdmin) {
-      navigate('/login');
-    }
-  }, [navigate]);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CheckInResult | null>(null);
@@ -101,6 +96,28 @@ export const CheckInForm = () => {
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [countdown, setCountdown] = useState<number | null>(null);
 
+
+
+   useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const uid = user.uid;
+        const adminRef = doc(db, 'admin', uid);
+        const adminSnap = await getDoc(adminRef);
+
+        if (adminSnap.exists()) {
+          setUser(user);
+        } else {
+          await signOut(auth);
+          navigate('/login');
+        }
+      } else {
+        navigate('/login');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
   // ✅ NUEVO: Configurar PWA para check-in
   useEffect(() => {
     // Cambiar manifest para check-in cuando se monta el componente

@@ -21,11 +21,16 @@ const app = express();
 // 'https://tentcowork-estudiantes-v2.web.app'
 // Para desarrollo, puedes mantener 'http://localhost:5173'
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://tentcowork-estudiantes-v2.web.app', 'https://tentcowork-estudiantes-v2.firebaseapp.com'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Asegúrate de incluir todos los métodos HTTP que usas
+  origin: [
+    'https://estudiantes.tentcowork.com',
+    'http://localhost:3000',  // ✅ CORREGIDO
+    'http://localhost:5173',  // ✅ AGREGAR VITE TAMBIÉN
+    'https://tentcowork-estudiantes-v2.web.app',
+    'https://tentcowork-estudiantes-v2.firebaseapp.com',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // ✅ AGREGAR OPTIONS
   credentials: true
 }));
-
 app.use(express.json());
 
 // Rutas

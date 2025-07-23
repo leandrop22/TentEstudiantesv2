@@ -353,7 +353,7 @@ export default function ProfileInfo() {
         }
       };
       
-      const response = await fetch('https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend/api/payments/create-preference', {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/payments/create-preference`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

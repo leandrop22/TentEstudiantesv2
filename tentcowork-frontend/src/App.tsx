@@ -8,13 +8,21 @@ import { AuthProvider } from './context/AuthContext';
 import AdminLayout from './components/Admin/AdminLayout';
 
 
+
 function App() {
   return (
     
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/checkin" element={<Checkin />} />
+          <Route 
+            path="/checkin" 
+            element={
+            
+                <Checkin/>
+              
+            } 
+          />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin/*" element={<AdminLayout />} />

@@ -67,7 +67,7 @@ export class PaymentService {
    */
   static async testConfiguration(): Promise<any> {
     try {
-      const response = await fetch(`${this.BASE_URL}/payments/test-config`);
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/payments/test-config`); 
       return await response.json();
     } catch (error) {
       // ✅ FIX: Manejo correcto del tipo 'unknown'
