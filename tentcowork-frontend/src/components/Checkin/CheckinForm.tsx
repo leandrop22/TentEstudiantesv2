@@ -91,6 +91,55 @@ export const CheckInForm = () => {
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [countdown, setCountdown] = useState<number | null>(null);
 
+  // ✅ NUEVO: Configurar PWA para check-in
+  useEffect(() => {
+    // Cambiar manifest para check-in cuando se monta el componente
+    const changeManifestForCheckIn = () => {
+      let manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+      
+      if (manifestLink) {
+        manifestLink.href = 'public/manifest-checkin.json';
+      } else {
+        // Crear el link si no existe
+        manifestLink = document.createElement('link');
+        manifestLink.rel = 'manifest';
+        manifestLink.href = 'public/manifest-checkin.json';
+        document.head.appendChild(manifestLink);
+      }
+      
+      // Cambiar el título también
+      document.title = 'Tent Check-in';
+      
+      // Cambiar el theme-color para check-in
+      let themeColorMeta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
+      if (themeColorMeta) {
+        themeColorMeta.content = '#004225'; // Verde de Tent para check-in
+      }
+      
+      console.log('✅ PWA configurada para check-in');
+    };
+
+    changeManifestForCheckIn();
+    
+    // Cleanup: restaurar el manifest original cuando se desmonte el componente
+    return () => {
+      const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+      if (manifestLink) {
+        manifestLink.href = 'public/manifest.json';
+      }
+      
+      document.title = 'Tent Cowork';
+      
+      // Restaurar theme-color original
+      const themeColorMeta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
+      if (themeColorMeta) {
+        themeColorMeta.content = '#004225'; // O el color original que tengas
+      }
+      
+      console.log('🔄 PWA restaurada a configuración original');
+    };
+  }, []);
+
   // Auto-cerrar modal para resultados exitosos
   useEffect(() => {
     if (result && result.success && !result.recovery && result.user) {
@@ -443,9 +492,7 @@ export const CheckInForm = () => {
         <div className="text-center mb-1">
           <div className="w-28 h-28 rounded-full overflow-hidden bg-white shadow-lg mx-auto mb-6">
             <img
-
               src="/logorecortadoo.jpg"
-
               alt="Logo Tent"
               className="object-cover w-full h-full"
             />

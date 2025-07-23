@@ -76,6 +76,7 @@ interface CacheData {
   students: Student[];
   lastUpdate: number;
   cacheExpiry: number;
+  dataType: 'active' | 'all'; // ✅ Nuevo: tipo de datos en cache
 }
 
 const formatDate = (timestamp: any) => {
@@ -120,6 +121,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
   const [loading, setLoading] = useState(true);
   const [cacheUsed, setCacheUsed] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(0);
+  const [dataScope, setDataScope] = useState<'active' | 'all'>('active'); // ✅ Nuevo: control de alcance de datos
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -134,7 +136,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
   const [adminAction, setAdminAction] = useState<'reset' | 'activate' | 'deactivate' | null>(null);
   const [isProcessingAdmin, setIsProcessingAdmin] = useState(false);
   
-  // ✅ Filtros con estudiantes activos por defecto
+  // ✅ Filtros completos pero con estado activo por defecto
   const [filters, setFilters] = useState({
     name: '',
     university: '',
@@ -144,8 +146,8 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     plan: '',
   });
 
-  // ✅ Cache del navegador - Cargar datos
-  const loadFromCache = (): CacheData | null => {
+  // ✅ Cache del navegador - Cargar datos (ahora con tipo de datos)
+  const loadFromCache = (requestedScope: 'active' | 'all'): CacheData | null => {
     try {
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
@@ -153,17 +155,26 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
         const now = Date.now();
         
         console.log('🔍 Verificando cache de estudiantes:', {
+          'Requested scope': requestedScope,
+          'Cached scope': data.dataType,
           'Cache timestamp': new Date(data.lastUpdate).toLocaleString(),
           'Current time': new Date(now).toLocaleString(),
           'Cache valid': now < data.cacheExpiry
         });
         
-        if (now < data.cacheExpiry) {
+        // ✅ Cache válido si:
+        // 1. No ha expirado
+        // 2. El scope coincide O tenemos 'all' y pedimos 'active' (subset válido)
+        const scopeMatches = data.dataType === requestedScope || 
+                           (data.dataType === 'all' && requestedScope === 'active');
+        
+        if (now < data.cacheExpiry && scopeMatches) {
           console.log('✅ Usando estudiantes desde cache');
           setCacheUsed(true);
+          setDataScope(data.dataType);
           return data;
         } else {
-          console.log('⏰ Cache de estudiantes expirado');
+          console.log('⏰ Cache de estudiantes inválido o scope diferente');
           localStorage.removeItem(CACHE_KEY);
         }
       }
@@ -174,18 +185,24 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     return null;
   };
 
-  // ✅ Cache del navegador - Guardar datos
-  const saveToCache = (studentsData: Student[]) => {
+  // ✅ Cache del navegador - Guardar datos (ahora con tipo de datos)
+  const saveToCache = (studentsData: Student[], scope: 'active' | 'all') => {
     try {
       const now = Date.now();
       const dataToCache: CacheData = {
         students: studentsData,
         lastUpdate: now,
-        cacheExpiry: now + CACHE_DURATION
+        cacheExpiry: now + CACHE_DURATION,
+        dataType: scope
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
-      console.log('💾 Estudiantes guardados en cache hasta:', new Date(dataToCache.cacheExpiry).toLocaleString());
+      console.log('💾 Estudiantes guardados en cache:', {
+        scope,
+        count: studentsData.length,
+        validUntil: new Date(dataToCache.cacheExpiry).toLocaleString()
+      });
       setLastUpdate(now);
+      setDataScope(scope);
     } catch (error) {
       console.error('❌ Error guardando cache de estudiantes:', error);
     }
@@ -235,29 +252,78 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     return student.plan || 'Sin plan';
   };
 
-  // ✅ Fetch optimizado con cache
-  const fetchStudents = async (forceRefresh = false) => {
+  // ✅ Función para determinar si necesitamos hacer fetch
+  const needsFetch = (requestedScope: 'active' | 'all') => {
+    // Si no hay datos, siempre fetch
+    if (students.length === 0) return true;
+    
+    // Si pedimos 'all' pero tenemos 'active', necesitamos fetch
+    if (requestedScope === 'all' && dataScope === 'active') return true;
+    
+    // Si pedimos 'active' y tenemos 'all', no necesitamos fetch
+    return false;
+  };
+
+  // ✅ Función para determinar el scope necesario basado en filtros
+  const getRequiredScope = () => {
+    // Si el filtro de estado no es 'activa' o está vacío, necesitamos todos
+    if (!filters.planStatus || filters.planStatus !== 'activa') {
+      return 'all';
+    }
+    // Si solo buscamos activos, con 'active' es suficiente
+    return 'active';
+  };
+
+  // ✅ Fetch optimizado con manejo inteligente de scope
+  const fetchStudents = async (forceRefresh = false, requestedScope?: 'active' | 'all') => {
     try {
       setLoading(true);
       setCacheUsed(false);
       
-      console.log('🔄 Iniciando fetch de estudiantes...');
+      const scope = requestedScope || getRequiredScope();
       
-      // ✅ OPTIMIZACIÓN: Solo estudiantes activos para el filtro predeterminado
+      console.log('🔄 Iniciando fetch de estudiantes...', {
+        scope,
+        forceRefresh,
+        currentDataScope: dataScope
+      });
+      
+      // ✅ Intentar usar cache si no forzamos refresh
+      if (!forceRefresh) {
+        const cachedData = loadFromCache(scope);
+        if (cachedData) {
+          let filteredStudents = cachedData.students;
+          
+          // Si tenemos 'all' pero pedimos 'active', filtrar
+          if (cachedData.dataType === 'all' && scope === 'active') {
+            filteredStudents = cachedData.students.filter(s => 
+              getMembershipStatus(s) === 'activa'
+            );
+            console.log('✂️ Filtrando estudiantes activos del cache completo');
+          }
+          
+          setStudents(filteredStudents);
+          setLastUpdate(cachedData.lastUpdate);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // ✅ Construir query según el scope
       let studentsQuery;
       
-      if (filters.planStatus === 'activa') {
+      if (scope === 'active') {
         // Solo estudiantes con membresía activa
         studentsQuery = query(
           collection(db, 'students'),
           where('membresia.estado', '==', 'activa'),
-          limit(300) // Límite de seguridad
+          limit(300)
         );
       } else {
-        // Todos los estudiantes si se cambia el filtro
+        // Todos los estudiantes
         studentsQuery = query(
           collection(db, 'students'),
-          limit(500) // Límite de seguridad
+          limit(800) // Límite más alto para todos
         );
       }
       
@@ -269,13 +335,13 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
       
       console.log('✅ Estudiantes obtenidos:', {
         'Total estudiantes': studentsData.length,
-        'Filtro aplicado': filters.planStatus
+        'Scope aplicado': scope
       });
       
       setStudents(studentsData);
       
       // ✅ Guardar en cache
-      saveToCache(studentsData);
+      saveToCache(studentsData, scope);
 
     } catch (error) {
       console.error("❌ Error al obtener estudiantes:", error);
@@ -284,32 +350,31 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     }
   };
 
+  // ✅ Efecto inicial - cargar estudiantes activos por defecto
   useEffect(() => {
-    // Intentar cargar desde cache primero
-    const cachedData = loadFromCache();
-    if (cachedData) {
-      setStudents(cachedData.students);
-      setLastUpdate(cachedData.lastUpdate);
-      setLoading(false);
-      return;
-    }
-    
-    // Si no hay cache válido, hacer fetch
-    fetchStudents();
+    fetchStudents(false, 'active');
   }, []);
 
-  // ✅ Refetch cuando cambia el filtro de estado (pero no por búsqueda de nombre)
+  // ✅ Efecto para manejar cambios de filtros que requieren diferente scope
   useEffect(() => {
-    if (!loading && filters.planStatus !== 'activa') {
-      // Solo hacer fetch si el filtro cambió de "activa" a otra cosa
-      fetchStudents();
+    const requiredScope = getRequiredScope();
+    
+    // Solo hacer fetch si necesitamos un scope diferente al actual
+    if (needsFetch(requiredScope)) {
+      console.log('🔄 Cambiando scope de datos:', {
+        from: dataScope,
+        to: requiredScope,
+        reason: 'Filter change'
+      });
+      fetchStudents(false, requiredScope);
     }
   }, [filters.planStatus]);
 
   const handleForceRefresh = () => {
     console.log('🔄 Forzando actualización de estudiantes...');
     localStorage.removeItem(CACHE_KEY);
-    fetchStudents(true);
+    const requiredScope = getRequiredScope();
+    fetchStudents(true, requiredScope);
   };
 
   const handleResetMembership = async (studentId: string) => {
@@ -427,10 +492,10 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
     return actions;
   };
 
-  // ✅ Filtrado optimizado - solo filtra localmente por nombre cuando hay búsqueda
+  // ✅ Filtrado optimizado - filtra localmente
   const filteredAndSortedStudents = useMemo(() => {
     let filtered = students.filter(student => {
-      // ✅ Filtro por nombre (solo cuando hay búsqueda activa)
+      // ✅ Filtro por nombre
       const matchesName = !filters.name || 
         student.fullName?.toLowerCase().includes(filters.name.toLowerCase());
       
@@ -547,14 +612,14 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
 
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Estudiantes');
       
-      const fileName = `estudiantes_${filters.planStatus === 'activa' ? 'activos_' : ''}${new Date().toISOString().split('T')[0]}.xlsx`;
+      const fileName = `estudiantes_${dataScope}_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(workbook, fileName);
     } catch (error) {
       console.error("Error al exportar:", error);
     } finally {
       setExporting(false);
     }
-  }, [filteredAndSortedStudents, filters.planStatus]);
+  }, [filteredAndSortedStudents, dataScope]);
 
   const handleDeleteStudent = async (studentId: string) => {
     try {
@@ -660,7 +725,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
         <div className="flex flex-col items-center">
           <div className="w-16 h-16 border-4 border-tent-orange border-dashed rounded-full animate-spin mb-4"></div>
           <p className="text-gray-600 font-medium">
-            {cacheUsed ? 'Cargando estudiantes desde cache...' : 'Cargando estudiantes optimizados...'}
+            {cacheUsed ? 'Cargando estudiantes desde cache...' : `Cargando estudiantes ${dataScope === 'active' ? 'activos' : 'completos'}...`}
           </p>
         </div>
       </div>
@@ -684,7 +749,10 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
               <h2 className="text-2xl font-bold text-white">Estudiantes Registrados</h2>
               <p className="text-orange-100 text-sm flex items-center space-x-2">
                 <span>
-                  {filters.planStatus === 'activa' ? 'Mostrando solo estudiantes activos' : 'Visualización de estudiantes y membresías'}
+                  {dataScope === 'active' 
+                    ? '🎯 Vista optimizada - Solo estudiantes activos' 
+                    : '📊 Vista completa - Todos los estudiantes'
+                  }
                 </span>
                 {cacheUsed && (
                   <span className="px-2 py-1 bg-white/20 text-orange-100 text-xs rounded-full font-medium">
@@ -701,6 +769,26 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
           </div>
           
           <div className="flex items-center space-x-2 flex-wrap gap-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowFilters(!showFilters)}
+              className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2"
+            >
+              <Filter size={16} />
+              <span>Filtros</span>
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleForceRefresh}
+              className="bg-white/20 hover:bg-white/30 text-white rounded-xl px-4 py-2 font-medium transition-all duration-200 flex items-center space-x-2"
+            >
+              <RefreshCw size={16} />
+              <span>Actualizar</span>
+            </motion.button>
+            
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -728,7 +816,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           <div className="bg-white/10 rounded-lg p-4 text-center">
             <div className="text-white text-2xl font-bold">{stats.total}</div>
-            <div className="text-white/80 text-sm">Total</div>
+            <div className="text-white/80 text-sm">Total {dataScope === 'active' ? 'Activos' : 'Estudiantes'}</div>
           </div>
           <div className="bg-white/10 rounded-lg p-4 text-center">
             <div className="text-white text-2xl font-bold">{stats.certificados}</div>
@@ -745,7 +833,7 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* ✅ FILTROS COMPLETOS - Ahora siempre disponibles */}
       <AnimatePresence>
         {showFilters && (
           <motion.div
@@ -779,29 +867,38 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                 ))}
               </select>
               
-              {/* Plan */}
-              <select
-                value={filters.plan}
-                onChange={(e) => setFilters({ ...filters, plan: e.target.value })}
+              {/* Carrera */}
+              <input
+                type="text"
+                placeholder="Filtrar por carrera..."
+                value={filters.carrera}
+                onChange={(e) => setFilters({ ...filters, carrera: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              >
-                <option value="">Todos los planes</option>
-                {planes.map(plan => (
-                  <option key={plan.value} value={plan.value}>{plan.label}</option>
-                ))}
-              </select>
+              />
               
-              {/* Estado de membresía - ✅ Con activa por defecto */}
+              {/* ✅ Estado de membresía - TODOS LOS ESTADOS DISPONIBLES */}
               <select
                 value={filters.planStatus}
                 onChange={(e) => setFilters({ ...filters, planStatus: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
-                <option value="">Todos los estados</option>
-                <option value="activa">✅ Activos (por defecto)</option>
+                <option value="">🔍 Todos los estados</option>
+                <option value="activa">✅ Membresía Activa</option>
                 <option value="pendiente">⏳ Pendiente</option>
                 <option value="no pagado">❌ No pagado</option>
                 <option value="cancelada">⚪ Cancelada</option>
+              </select>
+              
+              {/* ✅ Filtro de plan - TODOS LOS PLANES DISPONIBLES */}
+              <select
+                value={filters.plan}
+                onChange={(e) => setFilters({ ...filters, plan: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                <option value="">🏋️ Todos los planes</option>
+                {planes.map(plan => (
+                  <option key={plan.value} value={plan.value}>{plan.label}</option>
+                ))}
               </select>
               
               {/* Certificado */}
@@ -810,37 +907,34 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                 onChange={(e) => setFilters({ ...filters, certificado: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
-                <option value="">Tipo de alumno</option>
-                <option value="true">Alumno Regular</option>
-                <option value="false">No certificado</option>
-              </select>
-              
-              {/* Items por página */}
-              <select
-                value={itemsPerPage}
-                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              >
-                <option value={10}>10 por página</option>
-                <option value={25}>25 por página</option>
-                <option value={50}>50 por página</option>
-                <option value={100}>100 por página</option>
+                <option value="">🎓 Tipo de alumno</option>
+                <option value="true">✅ Alumno Regular</option>
+                <option value="false">❌ No certificado</option>
               </select>
             </div>
             
-            {/* Indicador de filtros aplicados */}
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-gray-600 bg-white px-3 py-1 rounded-lg border">
-                {filters.planStatus === 'activa' 
-                  ? `🎯 Mostrando ${filteredAndSortedStudents.length} estudiantes activos`
-                  : filters.planStatus
-                  ? `Mostrando ${filteredAndSortedStudents.length} estudiantes con estado: ${filters.planStatus}`
-                  : `Mostrando ${filteredAndSortedStudents.length} estudiantes`
-                }
+            {/* ✅ Información de filtros aplicados y controles */}
+            <div className="mt-4 flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="text-sm text-gray-600 bg-white px-3 py-1 rounded-lg border">
+                  📊 Mostrando {filteredAndSortedStudents.length} de {students.length} estudiantes
+                  {dataScope === 'active' && (
+                    <span className="ml-2 text-green-600 font-medium">(Solo activos cargados)</span>
+                  )}
+                </div>
+                
+                {/* Indicador de scope de datos */}
+                <div className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  dataScope === 'active' 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'bg-blue-100 text-blue-700'
+                }`}>
+                  {dataScope === 'active' ? '🎯 Datos: Solo Activos' : '📊 Datos: Completos'}
+                </div>
               </div>
               
-              {/* Toggle para filtro de estudiantes activos */}
               <div className="flex items-center space-x-3">
+                {/* ✅ Toggle rápido para estudiantes activos */}
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -853,11 +947,36 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                   />
                   <span className="text-sm font-medium text-gray-700 flex items-center space-x-1">
                     <UserCheck size={16} />
-                    <span>Solo estudiantes activos</span>
+                    <span>Solo activos</span>
                   </span>
                 </label>
+                
+                {/* Items por página */}
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                >
+                  <option value={10}>10 por página</option>
+                  <option value={25}>25 por página</option>
+                  <option value={50}>50 por página</option>
+                  <option value={100}>100 por página</option>
+                </select>
               </div>
             </div>
+            
+            {/* ✅ Alertas informativas */}
+            {filters.planStatus !== 'activa' && filters.planStatus !== '' && dataScope === 'active' && (
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle size={16} className="text-yellow-600" />
+                  <span className="text-sm text-yellow-800">
+                    <strong>Cargando datos completos:</strong> Has filtrado por estado "{filters.planStatus}". 
+                    Se están cargando todos los estudiantes para mostrar resultados completos.
+                  </span>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1369,16 +1488,23 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
         )}
       </AnimatePresence>
 
-      {/* Cache Info - Información del cache */}
+      {/* ✅ Información del cache y sistema optimizado */}
       {lastUpdate > 0 && (
-        <div className="text-center mt-4 text-sm text-gray-500 bg-gray-50 p-2 rounded-lg">
-          <div className="flex items-center justify-center space-x-4">
+        <div className="text-center mt-4 text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+          <div className="flex items-center justify-center space-x-4 flex-wrap gap-2">
             <span>Cache válido hasta: {new Date(lastUpdate + CACHE_DURATION).toLocaleString()}</span>
             {cacheUsed && (
               <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
                 📱 Datos desde cache
               </span>
             )}
+            <span className={`px-2 py-1 text-xs rounded-full ${
+              dataScope === 'active' 
+                ? 'bg-green-100 text-green-700' 
+                : 'bg-blue-100 text-blue-700'
+            }`}>
+              {dataScope === 'active' ? '🎯 Optimizado: Solo activos' : '📊 Completo: Todos los datos'}
+            </span>
           </div>
         </div>
       )}
@@ -1387,4 +1513,3 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
 };
 
 export default StudentsTable;
-    
