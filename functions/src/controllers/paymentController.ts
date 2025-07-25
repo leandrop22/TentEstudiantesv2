@@ -7,6 +7,9 @@ import { Request, Response } from 'express';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { admin, db } from '../config/firebase';
 import { CreatePreferenceRequest, MercadoPagoPaymentStatus, MercadoPagoPreferenceResponse, MercadoPagoWebhookData, PaymentRecord } from '../types/mercadoPago';
+import * as functions from 'firebase-functions';
+
+
 
 // 🔧 CONFIGURAR MERCADO PAGO (NUEVA SINTAXIS) - CORREGIDA
 let client: MercadoPagoConfig | null = null;
@@ -17,7 +20,7 @@ let payment: Payment | null = null;
 export function initializeMercadoPago() {
   console.log('🔧 Inicializando Mercado Pago...');
   
-  const token = process.env.MP_ACCESS_TOKEN;
+  const token = functions.config().mercadopago?.access_token || process.env.MP_ACCESS_TOKEN;
   console.log('Token presente:', !!token);
   
   if (!token) {
