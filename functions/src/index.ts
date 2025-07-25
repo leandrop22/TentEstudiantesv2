@@ -34,14 +34,6 @@ app.use(express.json());
 app.use('/api', adminRoutes);
 app.use('/api', paymentRoutes);
 
-// ✅ Solo para desarrollo local
-if (process.env.NODE_ENV !== 'production') {
-  const APP_PORT = process.env.APP_PORT || 3001;
-  app.listen(APP_PORT, () => {
-    console.log(`🚀 Server running on port ${APP_PORT}`);
-    console.log(`📡 API available at http://localhost:${APP_PORT}/api`);
-  });
-}
 
 // ✅ Para Firebase Functions
-export const backend = functions.https.onRequest(app);
+exports.backend = functions.https.onRequest(app);

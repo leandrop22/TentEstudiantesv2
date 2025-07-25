@@ -4,7 +4,13 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
+    "build": "tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "npm run build && cd .. && firebase deploy --only functions",
+    "logs": "firebase functions:log",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

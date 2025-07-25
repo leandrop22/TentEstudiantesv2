@@ -115,9 +115,9 @@ export default function LoginForm() {
       const user = result.user;
       const uid = user.uid;
 
-      // ✅ CORREGIDO: Usar URL completa del backend con /api/
+      
       try {
-        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/is-admin/${uid}`);
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/is-admin/${uid}`);
         if (res.ok) {
           const data = await res.json();
           if (data.isAdmin) {

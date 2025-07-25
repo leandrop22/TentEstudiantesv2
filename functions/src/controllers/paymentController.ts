@@ -200,7 +200,7 @@ export class PaymentController {
           failure: `${frontendUrl}/payment/failure`, 
           pending: `${frontendUrl}/payment/pending`,
         },
-        notification_url: `${backendUrl}/api/webhook/mercadopago`,
+        notification_url: `${backendUrl}/webhook/mercadopago`,
         external_reference: studentId,
         statement_descriptor: 'TENTCOWORK',
       };
@@ -345,7 +345,7 @@ export class PaymentController {
         hasPublicKey,
         backendUrl: process.env.BACKEND_URL,
         frontendUrl: process.env.FRONTEND_URL,
-        webhookUrl: `${process.env.BACKEND_URL}/api/webhook/mercadopago`,
+        webhookUrl: `${process.env.BACKEND_URL}/webhook/mercadopago`,
         clientInitialized: !!client,
         mpInitialized: ensureMPInitialized()
       });
