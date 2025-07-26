@@ -29,6 +29,8 @@ jobs:
         run: |
           cd tentcowork-frontend
           npm run build
+        env:
+          VITE_BACKEND_URL: https://backend-h2yatjzgba-uc.a.run.app/api
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -37,4 +39,3 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_TENTCOWORK_ESTUDIANTES_V2 }}'
           channelId: live
           projectId: tentcowork-estudiantes-v2
-          entryPoint: './tentcowork-frontend'
