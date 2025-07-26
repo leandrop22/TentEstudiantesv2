@@ -23,7 +23,7 @@ Sistema de gestión para espacios de coworking que permite a los estudiantes acc
 
 ### Backend (Node.js + Express + Firebase)
 - **Ubicación**: `tentcowork-backend/`
-- **Runtime**: Node.js 18
+- **Runtime**: Node.js 20
 - **Framework**: Express.js
 - **Hosting**: Firebase Cloud Functions
 - **Base de datos**: Firestore
@@ -32,8 +32,8 @@ Sistema de gestión para espacios de coworking que permite a los estudiantes acc
 ## 🚀 Despliegue Rápido
 
 ### URLs de Producción
-- **Frontend**: https://tentcowork-estudiantes-v2.web.app/
-- **Backend**: https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend
+- **Frontend**: https://estudiantes.tentcowork.com/
+- **Backend**: https://backend-h2yatjzgba-uc.a.run.app
 
 ## 💻 Instalación y Desarrollo
 
@@ -70,7 +70,7 @@ cd ../../tentcowork-frontend
 npm install
 
 # Crear archivo de variables de entorno
-echo "VITE_BACKEND_URL=https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend" > .env
+echo "VITE_BACKEND_URL=https://backend-h2yatjzgba-uc.a.run.app" > .env
 ```
 
 ### 5. Desarrollo Local
@@ -122,7 +122,7 @@ MP_PUBLIC_KEY=tu_public_key_de_mercado_pago
 
 **Frontend** (`tentcowork-frontend/.env`):
 ```env
-VITE_BACKEND_URL=https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend
+VITE_BACKEND_URL=https://backend-h2yatjzgba-uc.a.run.app
 VITE_MP_PUBLIC_KEY=tu_public_key_de_mercado_pago
 ```
 
@@ -224,7 +224,7 @@ cd tentcowork-frontend && rm -rf dist/
 cd tentcowork-backend/functions && rm -rf dist/
 
 # Verificar URLs del backend
-curl https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend
+curl https://backend-h2yatjzgba-uc.a.run.app
 ```
 
 ## 🐛 Solución de Problemas Comunes

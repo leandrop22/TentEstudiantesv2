@@ -117,7 +117,7 @@ export default function LoginForm() {
 
       
       try {
-        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/is-admin/${uid}`);
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/is-admin/${uid}`);
         if (res.ok) {
           const data = await res.json();
           if (data.isAdmin) {

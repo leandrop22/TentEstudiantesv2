@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { assignAdminRole, checkAdminStatus } from '../controllers/adminController';
-
+import { checkAdminStatus, assignAdminRole } from '../controllers/adminController';
 
 const router = Router();
 
