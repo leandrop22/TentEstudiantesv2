@@ -27,6 +27,8 @@ export default function LoginForm() {
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const navigate = useNavigate();
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -117,7 +119,7 @@ export default function LoginForm() {
 
       
       try {
-        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/is-admin/${uid}`);
+        const res = await fetch(`${backendUrl}/is-admin/${uid}`);
         if (res.ok) {
           const data = await res.json();
           if (data.isAdmin) {

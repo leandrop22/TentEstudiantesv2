@@ -183,8 +183,8 @@ export class PaymentController {
       });
 
       // ✅ VERIFICAR URLs CON FALLBACKS
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+          const frontendUrl = process.env.FRONTEND_URL || 'https://estudiantes.tentcowork.com';
+      const backendUrl = process.env.BACKEND_URL || 'https://backend-h2yatjzgba-uc.a.run.app';
 
       // 🔧 CREAR LA PREFERENCIA CON CONFIGURACIÓN QUE FUNCIONA
       const preferenceData = {

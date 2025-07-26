@@ -57,6 +57,7 @@ export default function ProfileInfo() {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   // ✅ NUEVA FUNCIÓN: Detectar si es pase diario
   const isPaseDiario = (planName: string) => {
@@ -353,7 +354,7 @@ export default function ProfileInfo() {
         }
       };
       
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/payments/create-preference`, {
+      const response = await fetch(`${backendUrl}/payments/create-preference`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

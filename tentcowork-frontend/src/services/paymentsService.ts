@@ -31,8 +31,8 @@ export class PaymentService {
           facturado: false
         }
       };
-      
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/payments/create-preference`, {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      const response = await fetch(`${backendUrl}/payments/create-preference`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,7 +67,8 @@ export class PaymentService {
    */
   static async testConfiguration(): Promise<any> {
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/payments/test-config`); 
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      const response = await fetch(`${backendUrl}/payments/test-config`); 
       return await response.json();
     } catch (error) {
       // ✅ FIX: Manejo correcto del tipo 'unknown'
