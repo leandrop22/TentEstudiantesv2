@@ -4,9 +4,12 @@ import serviceAccount from '../../serviceAccountKey.json';
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    // Utiliza las credenciales de la cuenta de servicio para autenticar la aplicación de Firebase Admin.
-    credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-  });
+  credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+  projectId: serviceAccount.project_id,
+  storageBucket: `${serviceAccount.project_id}.appspot.com`
+});
+
+
 }
 
 

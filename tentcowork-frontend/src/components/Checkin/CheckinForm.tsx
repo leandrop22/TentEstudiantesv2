@@ -125,12 +125,12 @@ export const CheckInForm = () => {
       let manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
       
       if (manifestLink) {
-        manifestLink.href = 'public/manifest-checkin.json';
+        manifestLink.href = 'public/manifest.json';
       } else {
         // Crear el link si no existe
         manifestLink = document.createElement('link');
         manifestLink.rel = 'manifest';
-        manifestLink.href = 'public/manifest-checkin.json';
+        manifestLink.href = 'public/manifest.json';
         document.head.appendChild(manifestLink);
       }
       

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../../utils/firebase';
 import { collection, getDocs, addDoc, updateDoc, doc, getDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,9 +24,10 @@ import {
   Clock,
   Sun,
   CalendarDays,
-  Info
+  Info,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
-import { onAuthStateChanged } from 'firebase/auth';
 
 interface Plan {
   id: string;
@@ -72,9 +73,7 @@ interface Student {
   };
 }
 
-const SUPER_ADMINS = [
-  'leandropetricca123@gmail.com',
-];
+const SUPER_ADMINS = ['leandropetricca123@gmail.com'];
 const currentUserEmail = 'leandropetricca123@gmail.com';
 const isSuperAdmin = SUPER_ADMINS.includes(currentUserEmail);
 
@@ -87,24 +86,28 @@ const PaymentsTable: React.FC = () => {
   const [editingData, setEditingData] = useState<Partial<Payment>>({});
   const [searchResults, setSearchResults] = useState<Student[]>([]);
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false); // ✅ Cambio: por defecto oculto
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
+  // ✅ Cambio: Filtros por defecto - solo pagos de hoy
+  const today = new Date().toISOString().split('T')[0];
   const [filters, setFilters] = useState({
     name: '',
     plan: '',
     amount: '',
     paymentMethod: '',
-    date: '',
+    date: today, // ✅ Por defecto: fecha de hoy
     facturado: 'all' as 'all' | 'true' | 'false',
+    dateRange: 'today' as 'today' | 'week' | 'month' | 'all' // ✅ Nuevo filtro rápido
   });
 
   const [newPayment, setNewPayment] = useState({
     fullName: '',
     amount: 0,
     method: '',
-    date: new Date().toISOString().split('T')[0],
+    date: today,
     facturado: false,
     plan: '',
     studentId: '',
@@ -112,7 +115,7 @@ const PaymentsTable: React.FC = () => {
 
   const paymentMethods = ['Efectivo', 'Mercado Pago Transferencia', 'Mercado Pago Posnet','Mercado Pago Hospedado'];
 
-  // ✅ NUEVA FUNCIÓN: Detectar si es pase diario
+  // ✅ Función optimizada: Detectar si es pase diario
   const isPaseDiario = (planName: string, price: number = 0) => {
     const nombre = planName.toLowerCase();
     return nombre.includes('diario') || 
@@ -122,27 +125,19 @@ const PaymentsTable: React.FC = () => {
            price <= 8000;
   };
 
-  // ✅ NUEVA FUNCIÓN: Calcular fechas según tipo de plan
+  // ✅ Función optimizada: Calcular fechas según tipo de plan
   const calcularFechasPlan = (planName: string, price: number, fechaPago: Date) => {
-    let fechaDesde: Date;
+    const fechaDesde = new Date(fechaPago);
     let fechaHasta: Date;
 
     if (isPaseDiario(planName, price)) {
-      // Para pase diario: desde el momento del pago hasta las 23:59:59 del mismo día
-      fechaDesde = new Date(fechaPago);
+      // Para pase diario: hasta las 23:59:59 del mismo día
       fechaHasta = new Date(fechaPago);
-      fechaHasta.setHours(23, 59, 59, 999); // Hasta las 23:59:59.999
-      
-     
+      fechaHasta.setHours(23, 59, 59, 999);
     } else {
-      // Para planes mensuales: desde la fecha del pago hasta 30 días después
-      fechaDesde = new Date(fechaPago);
+      // Para planes mensuales: 30 días después
       fechaHasta = new Date(fechaPago);
-      fechaHasta.setDate(fechaHasta.getDate() + 30); // 30 días
-      
-      console.log(`📅 Plan Mensual: ${planName}`);
-      console.log(`⏰ Desde: ${fechaDesde.toLocaleString()}`);
-      console.log(`⏰ Hasta: ${fechaHasta.toLocaleString()}`);
+      fechaHasta.setDate(fechaHasta.getDate() + 30);
     }
 
     return {
@@ -151,25 +146,100 @@ const PaymentsTable: React.FC = () => {
     };
   };
 
-  // ✅ NUEVA FUNCIÓN: Obtener información del tipo de plan seleccionado
+  // ✅ Nueva función: Verificar estado de vigencia
+  const getVigenciaStatus = (planName: string, price: number, fechaPago: string) => {
+    const plan = plans.find(p => p.name === planName);
+    const esDiario = isPaseDiario(planName, price);
+    const fechaPagoDate = new Date(fechaPago + 'T12:00:00');
+    const now = new Date();
+    
+    let fechaVencimiento: Date;
+    
+    if (esDiario) {
+      fechaVencimiento = new Date(fechaPagoDate);
+      fechaVencimiento.setHours(23, 59, 59, 999);
+    } else {
+      fechaVencimiento = new Date(fechaPagoDate);
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+    }
+    
+    const isVencido = now > fechaVencimiento;
+    const horasRestantes = Math.max(0, (fechaVencimiento.getTime() - now.getTime()) / (1000 * 60 * 60));
+    
+    return {
+      esDiario,
+      isVencido,
+      fechaVencimiento,
+      horasRestantes,
+      status: isVencido ? 'vencido' : (horasRestantes < 24 && !esDiario ? 'por-vencer' : 'vigente')
+    };
+  };
+
+  // ✅ Función optimizada: Obtener información del plan seleccionado
   const getSelectedPlanInfo = () => {
     if (!newPayment.plan) return null;
     
     const selectedPlan = plans.find(p => p.name === newPayment.plan);
     if (!selectedPlan) return null;
     
-    const esDialo = isPaseDiario(selectedPlan.name, selectedPlan.price);
+    const esDiario = isPaseDiario(selectedPlan.name, selectedPlan.price);
     return {
       plan: selectedPlan,
-      esDiario: esDialo,
-      vigencia: esDialo ? 'hasta las 23:59 del día' : '30 días desde el pago'
+      esDiario,
+      vigencia: esDiario ? 'hasta las 23:59 del día' : '30 días desde el pago'
     };
   };
 
+  // ✅ Filtros optimizados con useMemo
+  const filteredPayments = useMemo(() => {
+    return payments.filter(payment => {
+      // Filtros de texto
+      const matchesName = payment.fullName.toLowerCase().includes(filters.name.toLowerCase());
+      const matchesPlan = payment.plan.toLowerCase().includes(filters.plan.toLowerCase());
+      const matchesAmount = filters.amount === '' || payment.amount.toString().includes(filters.amount);
+      const matchesMethod = payment.method.toLowerCase().includes(filters.paymentMethod.toLowerCase());
+      const matchesFacturado = filters.facturado === 'all' || 
+        (filters.facturado === 'true' && payment.facturado) ||
+        (filters.facturado === 'false' && !payment.facturado);
+
+      // ✅ Filtro de fecha optimizado
+      let matchesDate = true;
+      const paymentDate = new Date(payment.date);
+      const today = new Date();
+      
+      switch (filters.dateRange) {
+        case 'today':
+          matchesDate = payment.date === today.toISOString().split('T')[0];
+          break;
+        case 'week':
+          const weekAgo = new Date(today);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          matchesDate = paymentDate >= weekAgo && paymentDate <= today;
+          break;
+        case 'month':
+          const monthAgo = new Date(today);
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          matchesDate = paymentDate >= monthAgo && paymentDate <= today;
+          break;
+        case 'all':
+          matchesDate = filters.date === '' || payment.date.includes(filters.date);
+          break;
+      }
+
+      return matchesName && matchesPlan && matchesAmount && matchesMethod && matchesDate && matchesFacturado;
+    });
+  }, [payments, filters]);
+
   useEffect(() => {
-    fetchPayments();
-    fetchStudents();
-    fetchPlans();
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([fetchPayments(), fetchStudents(), fetchPlans()]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
   }, []);
 
   const fetchPayments = async () => {
@@ -187,7 +257,8 @@ const PaymentsTable: React.FC = () => {
           plan: data.plan || '',
           studentId: data.studentId || '',
         };
-      });
+      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // ✅ Ordenar por fecha descendente
+      
       setPayments(paymentsData);
     } catch (error: any) {
       console.error("Error fetching payments: ", error);
@@ -196,11 +267,9 @@ const PaymentsTable: React.FC = () => {
 
   const fetchStudents = async () => {
     try {
-      console.log('=== CARGANDO ESTUDIANTES ===');
       const querySnapshot = await getDocs(collection(db, 'students'));
       const studentsData = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        console.log('Estudiante raw de Firebase:', doc.id, data);
         return {
           id: doc.id,
           fullName: data.fullName || '',
@@ -228,15 +297,13 @@ const PaymentsTable: React.FC = () => {
         };
       });
       setStudents(studentsData);
-      console.log('✅ Estudiantes procesados:', studentsData.length);
     } catch (error: any) {
-      console.error("❌ Error fetching students: ", error);
+      console.error("Error fetching students: ", error);
     }
   };
 
   const fetchPlans = async () => {
     try {
-      console.log('=== CARGANDO PLANES ===');
       const querySnapshot = await getDocs(collection(db, 'plans'));
       const plansData = querySnapshot.docs.map(doc => {
         const data = doc.data();
@@ -248,14 +315,12 @@ const PaymentsTable: React.FC = () => {
         };
       });
       setPlans(plansData);
-      console.log('Planes cargados:', plansData);
       
       if (plansData.length === 0) {
         console.log('⚠️ NO SE ENCONTRARON PLANES en la colección "plans"');
-        alert('No hay planes configurados. Por favor, crea planes en la colección "plans" de Firebase.');
       }
     } catch (error: any) {
-      console.error("❌ Error fetching plans: ", error);
+      console.error("Error fetching plans: ", error);
     }
   };
 
@@ -268,22 +333,15 @@ const PaymentsTable: React.FC = () => {
     
     const results = students.filter(student =>
       student.fullName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ).slice(0, 5); // ✅ Limitar resultados
+    
     setSearchResults(results);
     setShowStudentDropdown(true);
   };
 
   const selectStudent = (student: Student) => {
-    console.log('=== ESTUDIANTE SELECCIONADO ===');
-    console.log('Estudiante completo:', student);
-    console.log('ID:', student.id);
-    console.log('Nombre:', student.fullName);
-    console.log('Plan actual:', student.plan || 'SIN PLAN');
-    
     const currentPlan = student.plan || '';
     const studentPlan = plans.find(plan => plan.name === currentPlan);
-    
-    console.log('Plan encontrado en lista de planes:', studentPlan);
     
     const updatedPayment = {
       ...newPayment,
@@ -293,7 +351,6 @@ const PaymentsTable: React.FC = () => {
       studentId: student.id,
     };
     
-    console.log('Datos actualizados del nuevo pago:', updatedPayment);
     setNewPayment(updatedPayment);
     setShowStudentDropdown(false);
   };
@@ -308,33 +365,14 @@ const PaymentsTable: React.FC = () => {
   };
 
   const handleAddPayment = async () => {
-    if (isSubmitting) {
-      console.log('Ya se está procesando un pago...');
-      return;
-    }
+    if (isSubmitting) return;
 
     try {
       setIsSubmitting(true);
 
       // Validaciones
-      if (!newPayment.fullName) {
-        alert('Debe seleccionar un estudiante');
-        return;
-      }
-      if (!newPayment.plan) {
-        alert('Debe seleccionar un plan');
-        return;
-      }
-      if (!newPayment.method) {
-        alert('Debe seleccionar un método de pago');
-        return;
-      }
-      if (newPayment.amount <= 0) {
-        alert('El monto debe ser mayor a 0');
-        return;
-      }
-      if (!newPayment.studentId) {
-        alert('Error: No se pudo identificar al estudiante. Intente seleccionarlo nuevamente.');
+      if (!newPayment.fullName || !newPayment.plan || !newPayment.method || newPayment.amount <= 0 || !newPayment.studentId) {
+        alert('Por favor complete todos los campos requeridos');
         return;
       }
 
@@ -342,45 +380,26 @@ const PaymentsTable: React.FC = () => {
         fullName: newPayment.fullName,
         amount: newPayment.amount,
         method: newPayment.method,
-        date: newPayment.date || new Date().toISOString().split('T')[0],
+        date: newPayment.date,
         facturado: newPayment.facturado,
         plan: newPayment.plan,
         studentId: newPayment.studentId,
       };
 
-      console.log('=== AGREGANDO PAGO ===');
-      console.log('Datos del pago:', paymentData);
-
       // Agregar el pago
       const docRef = await addDoc(collection(db, 'payments'), paymentData);
-      console.log('✅ Pago agregado con ID:', docRef.id);
       
-      // ✅ MEJORADO: Actualizar el plan del estudiante CON FECHAS ESPECÍFICAS SEGÚN TIPO DE PLAN
-      console.log('=== ACTUALIZANDO PLAN DEL ESTUDIANTE ===');
-      console.log('ID del estudiante:', newPayment.studentId);
-      console.log('Nuevo plan:', newPayment.plan);
-      
+      // Actualizar el plan del estudiante
       const studentRef = doc(db, 'students', newPayment.studentId);
       
       try {
-        // ✅ CORREGIDO: Manejar fechas correctamente sin problemas de zona horaria
-        const fechaPagoString = newPayment.date; // "2025-07-20" formato
-        const fechaPago = new Date(fechaPagoString + 'T12:00:00'); // Agregar hora del mediodía
-        
+        const fechaPago = new Date(newPayment.date + 'T12:00:00');
         const selectedPlan = plans.find(p => p.name === newPayment.plan);
         const { fechaDesde, fechaHasta } = calcularFechasPlan(
           newPayment.plan, 
           selectedPlan?.price || 0, 
           fechaPago
         );
-        
-        console.log('Fechas calculadas según tipo de plan:');
-        console.log('  - Plan:', newPayment.plan);
-        console.log('  - Es pase diario:', isPaseDiario(newPayment.plan, selectedPlan?.price || 0));
-        console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
-        console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
-        console.log('  - Fecha desde (local):', fechaDesde.toDate().toLocaleDateString());
-        console.log('  - Fecha hasta (local):', fechaHasta.toDate().toLocaleDateString());
         
         const updateData: any = {
           plan: newPayment.plan,
@@ -393,25 +412,10 @@ const PaymentsTable: React.FC = () => {
           activo: true
         };
         
-        console.log('Datos de actualización del estudiante:', updateData);
         await updateDoc(studentRef, updateData);
-        console.log('✅ Plan y membresía del estudiante actualizados exitosamente');
-        
-        // Verificar que se actualizó correctamente
-        const updatedStudent = await getDoc(studentRef);
-        if (updatedStudent.exists()) {
-          const data = updatedStudent.data();
-          console.log('✅ Verificación - Datos actualizados en Firebase:');
-          console.log('  - Plan:', data.plan);
-          console.log('  - Membresía:', data.membresia);
-          console.log('  - Activo:', data.activo);
-        }
-        
       } catch (updateError: any) {
-        console.error('❌ Error al actualizar el estudiante:', updateError);
-        console.error('Código de error:', updateError.code);
-        console.error('Mensaje:', updateError.message);
-        alert('El pago se agregó pero no se pudo actualizar el plan del estudiante. Error: ' + updateError.message);
+        console.error('Error al actualizar el estudiante:', updateError);
+        alert('El pago se agregó pero no se pudo actualizar el plan del estudiante.');
       }
       
       // Reset form
@@ -419,7 +423,7 @@ const PaymentsTable: React.FC = () => {
         fullName: '',
         amount: 0,
         method: '',
-        date: new Date().toISOString().split('T')[0],
+        date: today,
         facturado: false,
         plan: '',
         studentId: '',
@@ -427,14 +431,11 @@ const PaymentsTable: React.FC = () => {
       setIsModalOpen(false);
       
       // Refrescar datos
-      console.log('🔄 Refrescando datos en 2 segundos...');
       setTimeout(async () => {
         await fetchPayments();
         await fetchStudents();
-        console.log('✅ Datos refrescados');
-      }, 2000);
+      }, 1000);
       
-      // ✅ NUEVO: Mensaje específico según tipo de plan
       const planInfo = getSelectedPlanInfo();
       const tipoMensaje = planInfo?.esDiario 
         ? `Pago agregado. Membresía activa hasta las 23:59 de hoy.`
@@ -442,9 +443,7 @@ const PaymentsTable: React.FC = () => {
       
       alert(`✅ ${tipoMensaje}`);
     } catch (error: any) {
-      console.error('❌ Error completo al agregar pago:', error);
-      console.error('Código de error:', error.code);
-      console.error('Mensaje:', error.message);
+      console.error('Error al agregar pago:', error);
       alert('Error al agregar el pago: ' + error.message);
     } finally {
       setIsSubmitting(false);
@@ -472,10 +471,6 @@ const PaymentsTable: React.FC = () => {
     if (!editingPayment) return;
     
     try {
-      console.log('=== GUARDANDO EDICIÓN ===');
-      console.log('ID del pago:', editingPayment);
-      console.log('Datos a actualizar:', editingData);
-      
       const updateData: Partial<Payment> = {};
       if (editingData.fullName !== undefined) updateData.fullName = editingData.fullName;
       if (editingData.amount !== undefined) updateData.amount = editingData.amount;
@@ -484,15 +479,10 @@ const PaymentsTable: React.FC = () => {
       if (editingData.facturado !== undefined) updateData.facturado = editingData.facturado;
       if (editingData.plan !== undefined) updateData.plan = editingData.plan;
 
-      console.log('Datos limpiados para actualizar:', updateData);
-
       await updateDoc(doc(db, 'payments', editingPayment), updateData);
-      console.log('✅ Pago actualizado en la base de datos');
       
-      // Si cambió plan, fecha o monto, actualizar también el estudiante
+      // Actualizar estudiante si es necesario
       const payment = payments.find(p => p.id === editingPayment);
-      console.log('Pago original encontrado:', payment);
-      
       if (payment && payment.studentId) {
         const needsStudentUpdate = 
           (editingData.plan && editingData.plan !== payment.plan) ||
@@ -501,26 +491,14 @@ const PaymentsTable: React.FC = () => {
           (editingData.date && editingData.date !== payment.date);
         
         if (needsStudentUpdate) {
-          console.log('=== ACTUALIZANDO PLAN DEL ESTUDIANTE ===');
-          console.log('Student ID:', payment.studentId);
-          
           try {
-            // ✅ MEJORADO: Calcular nuevas fechas según el tipo de plan editado
             const fechaPago = new Date(editingData.date || payment.date);
             const planName = editingData.plan || payment.plan;
             const amount = editingData.amount || payment.amount;
             
             const { fechaDesde, fechaHasta } = calcularFechasPlan(planName, amount, fechaPago);
             
-            console.log('Nuevas fechas calculadas según tipo de plan:');
-            console.log('  - Plan:', planName);
-            console.log('  - Es pase diario:', isPaseDiario(planName, amount));
-            console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
-            console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
-            
-            const studentUpdateData: any = {
-              activo: true
-            };
+            const studentUpdateData: any = { activo: true };
             
             if (editingData.plan !== undefined) {
               studentUpdateData.plan = editingData.plan;
@@ -541,12 +519,10 @@ const PaymentsTable: React.FC = () => {
               studentUpdateData['membresia.fechaHasta'] = fechaHasta;
             }
             
-            console.log('Datos de actualización del estudiante:', studentUpdateData);
             await updateDoc(doc(db, 'students', payment.studentId), studentUpdateData);
-            console.log('✅ Plan y membresía del estudiante actualizados exitosamente');
           } catch (studentUpdateError: any) {
-            console.error('❌ Error al actualizar plan del estudiante:', studentUpdateError);
-            alert('El pago se actualizó pero no se pudo actualizar el plan del estudiante: ' + studentUpdateError.message);
+            console.error('Error al actualizar plan del estudiante:', studentUpdateError);
+            alert('El pago se actualizó pero no se pudo actualizar el plan del estudiante.');
           }
         }
       }
@@ -557,25 +533,20 @@ const PaymentsTable: React.FC = () => {
       setTimeout(async () => {
         await fetchPayments();
         await fetchStudents();
-        console.log('✅ Datos refrescados');
-      }, 2000);
+      }, 1000);
       
       alert('✅ Pago actualizado exitosamente');
     } catch (error: any) {
-      console.error('❌ Error updating payment:', error);
+      console.error('Error updating payment:', error);
       alert('Error al actualizar el pago: ' + error.message);
     }
   };
 
   const toggleFacturado = async (paymentId: string, currentStatus: boolean) => {
     try {
-      console.log('Cambiando estado de facturación:', paymentId, 'de', currentStatus, 'a', !currentStatus);
-      
       await updateDoc(doc(db, 'payments', paymentId), {
         facturado: !currentStatus
       });
-      
-      console.log('Estado actualizado exitosamente');
       await fetchPayments();
     } catch (error: any) {
       console.error("Error updating facturado status: ", error);
@@ -585,28 +556,19 @@ const PaymentsTable: React.FC = () => {
 
   const handleDeletePayment = async (paymentId: string) => {
     try {
-      console.log('=== ELIMINANDO PAGO ===');
-      console.log('ID del pago a eliminar:', paymentId);
-      
       const paymentToDelete = payments.find(p => p.id === paymentId);
       if (!paymentToDelete) {
         alert('No se encontró el pago a eliminar');
         return;
       }
       
-      console.log('Pago a eliminar:', paymentToDelete);
-      
       await deleteDoc(doc(db, 'payments', paymentId));
-      console.log('✅ Pago eliminado de la base de datos');
       
       if (paymentToDelete.studentId) {
-        console.log('=== ACTUALIZANDO MEMBRESÍA DEL ESTUDIANTE ===');
-        console.log('Student ID:', paymentToDelete.studentId);
-        
         try {
           const studentRef = doc(db, 'students', paymentToDelete.studentId);
-          
           const studentDoc = await getDoc(studentRef);
+          
           if (studentDoc.exists()) {
             const updateData = {
               plan: '',
@@ -620,13 +582,9 @@ const PaymentsTable: React.FC = () => {
             };
             
             await updateDoc(studentRef, updateData);
-            console.log('✅ Membresía del estudiante actualizada (eliminada/pendiente)');
-          } else {
-            console.log('⚠️ El estudiante no existe en la base de datos');
           }
         } catch (updateError: any) {
-          console.error('❌ Error al actualizar membresía del estudiante:', updateError);
-          alert('El pago se eliminó pero no se pudo actualizar la membresía del estudiante: ' + updateError.message);
+          console.error('Error al actualizar membresía del estudiante:', updateError);
         }
       }
       
@@ -636,12 +594,11 @@ const PaymentsTable: React.FC = () => {
       setTimeout(async () => {
         await fetchPayments();
         await fetchStudents();
-        console.log('✅ Datos refrescados');
-      }, 2000);
+      }, 1000);
       
-      alert('✅ Pago eliminado exitosamente y membresía actualizada');
+      alert('✅ Pago eliminado exitosamente');
     } catch (error: any) {
-      console.error('❌ Error al eliminar pago:', error);
+      console.error('Error al eliminar pago:', error);
       alert('Error al eliminar el pago: ' + error.message);
     }
   };
@@ -650,16 +607,17 @@ const PaymentsTable: React.FC = () => {
     try {
       const dataToExport = filteredPayments.map(payment => {
         const plan = plans.find(p => p.name === payment.plan);
-        const esDiario = plan ? isPaseDiario(plan.name, plan.price) : false;
+        const vigenciaInfo = getVigenciaStatus(payment.plan, payment.amount, payment.date);
         
         return {
           'Estudiante': payment.fullName,
           'Plan': payment.plan,
-          'Tipo': esDiario ? 'Pase Diario' : 'Plan Mensual',
+          'Tipo': vigenciaInfo.esDiario ? 'Pase Diario' : 'Plan Mensual',
           'Monto': payment.amount,
           'Método de Pago': payment.method,
           'Fecha': payment.date,
-          'Vigencia': esDiario ? 'Hasta 23:59 del día' : '30 días',
+          'Estado Vigencia': vigenciaInfo.isVencido ? 'Vencido' : 'Vigente',
+          'Vencimiento': vigenciaInfo.fechaVencimiento.toLocaleDateString(),
           'Estado': payment.facturado ? 'Facturado' : 'Pendiente'
         };
       });
@@ -668,43 +626,84 @@ const PaymentsTable: React.FC = () => {
       const ws = XLSX.utils.json_to_sheet(dataToExport);
 
       const colWidths = [
-        { wch: 20 }, // Estudiante
-        { wch: 15 }, // Plan
-        { wch: 12 }, // Tipo
-        { wch: 10 }, // Monto
-        { wch: 15 }, // Método
-        { wch: 12 }, // Fecha
-        { wch: 15 }, // Vigencia
-        { wch: 12 }, // Estado
+        { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 10 }, 
+        { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 12 }
       ];
       ws['!cols'] = colWidths;
 
       XLSX.utils.book_append_sheet(wb, ws, 'Pagos');
 
-      const today = new Date().toISOString().split('T')[0];
       const fileName = `Pagos_${today}.xlsx`;
-
       XLSX.writeFile(wb, fileName);
     } catch (error: any) {
       console.error('Error al exportar a Excel:', error);
     }
   };
 
-  const filteredPayments = payments.filter(payment => {
-    const matchesName = payment.fullName.toLowerCase().includes(filters.name.toLowerCase());
-    const matchesPlan = payment.plan.toLowerCase().includes(filters.plan.toLowerCase());
-    const matchesAmount = filters.amount === '' || payment.amount.toString().includes(filters.amount);
-    const matchesMethod = payment.method.toLowerCase().includes(filters.paymentMethod.toLowerCase());
-    const matchesDate = filters.date === '' || payment.date.includes(filters.date);
-    const matchesFacturado = filters.facturado === 'all' || 
-      (filters.facturado === 'true' && payment.facturado) ||
-      (filters.facturado === 'false' && !payment.facturado);
+  // ✅ Componente optimizado de vigencia
+  const VigenciaStatus = ({ planName, amount, date }: { planName: string; amount: number; date: string }) => {
+    const vigenciaInfo = getVigenciaStatus(planName, amount, date);
+    
+    const getStatusColor = () => {
+      switch (vigenciaInfo.status) {
+        case 'vencido':
+          return 'bg-red-100 text-red-800 border-red-300';
+        case 'por-vencer':
+          return 'bg-orange-100 text-orange-800 border-orange-300';
+        default:
+          return vigenciaInfo.esDiario 
+            ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+            : 'bg-green-100 text-green-800 border-green-300';
+      }
+    };
 
-    return matchesName && matchesPlan && matchesAmount && matchesMethod && matchesDate && matchesFacturado;
-  });
+    const getStatusText = () => {
+      if (vigenciaInfo.isVencido) {
+        return 'Vencido';
+      }
+      
+      if (vigenciaInfo.esDiario) {
+        const horasRestantes = Math.floor(vigenciaInfo.horasRestantes);
+        const minutosRestantes = Math.floor((vigenciaInfo.horasRestantes % 1) * 60);
+        
+        if (horasRestantes > 0) {
+          return `${horasRestantes}h ${minutosRestantes}m`;
+        } else {
+          return `${minutosRestantes}m`;
+        }
+      } else {
+        const diasRestantes = Math.floor(vigenciaInfo.horasRestantes / 24);
+        return `${diasRestantes} días`;
+      }
+    };
 
-  // ✅ NUEVO: Obtener información del plan seleccionado para mostrar en el modal
-  const selectedPlanInfo = getSelectedPlanInfo();
+    return (
+      <div className="flex flex-col space-y-1">
+        <span className={`text-xs px-2 py-1 rounded-full font-medium border ${getStatusColor()}`}>
+          {vigenciaInfo.esDiario ? '☀️' : '📅'} {getStatusText()}
+        </span>
+        {vigenciaInfo.status === 'por-vencer' && (
+          <span className="text-xs text-orange-600 flex items-center">
+            <AlertCircle size={10} className="mr-1" />
+            Por vencer
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="bg-gray-50 rounded-xl shadow-lg overflow-hidden">
+        <div className="flex items-center justify-center h-64">
+          <div className="flex items-center space-x-3">
+            <RefreshCw className="animate-spin text-tent-orange" size={24} />
+            <span className="text-gray-600">Cargando pagos...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -712,24 +711,56 @@ const PaymentsTable: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       className="bg-gray-50 rounded-xl shadow-lg overflow-hidden"
     >
-      {/* Header */}
+      {/* Header optimizado */}
       <div className="bg-tent-orange text-white p-6 rounded-t-xl mb-0">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-3">
             <CreditCard size={24} />
             <div>
               <h2 className="text-xl font-bold">Gestión de Pagos</h2>
-              <p className="text-orange-100 text-sm">Registro de pagos de estudiantes • {filteredPayments.length} pagos</p>
+              <p className="text-orange-100 text-sm">
+                {filters.dateRange === 'today' ? 'Pagos de hoy' : 
+                 filters.dateRange === 'week' ? 'Última semana' :
+                 filters.dateRange === 'month' ? 'Último mes' : 'Todos los pagos'} • {filteredPayments.length} registros
+              </p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
+            {/* ✅ Filtros rápidos */}
+            <div className="flex items-center space-x-2 bg-white/10 rounded-lg p-1">
+              {(['today', 'week', 'month', 'all'] as const).map((range) => (
+                <button
+                  key={range}
+                  onClick={() => setFilters({ ...filters, dateRange: range, date: range === 'today' ? today : '' })}
+                  className={`px-3 py-1 rounded text-sm transition-colors ${
+                    filters.dateRange === range 
+                      ? 'bg-white text-tent-orange font-medium' 
+                      : 'text-white hover:bg-white/20'
+                  }`}
+                >
+                  {range === 'today' ? 'Hoy' : 
+                   range === 'week' ? 'Semana' :
+                   range === 'month' ? 'Mes' : 'Todo'}
+                </button>
+              ))}
+            </div>
+            
+            <button
+              onClick={exportToExcel}
+              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <Download size={16} />
+              <span>Exportar</span>
+            </button>
+            
             <button 
               onClick={() => setShowFilters(!showFilters)}
               className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
             >
               {showFilters ? <EyeOff size={16} /> : <Eye size={16} />}
-              <span>{showFilters ? 'Ocultar' : 'Mostrar'} Filtros</span>
+              <span>Filtros</span>
             </button>
+            
             <button
               onClick={() => setIsModalOpen(true)}
               className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
@@ -741,7 +772,7 @@ const PaymentsTable: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* Filtros avanzados */}
       <AnimatePresence>
         {showFilters && (
           <motion.div
@@ -753,7 +784,7 @@ const PaymentsTable: React.FC = () => {
             <div className="bg-gray-50 p-4 border-b border-gray-200">
               <div className="flex items-center space-x-2 mb-4">
                 <Filter className="text-gray-500" size={20} />
-                <h3 className="text-sm font-medium text-gray-700">Filtros</h3>
+                <h3 className="text-sm font-medium text-gray-700">Filtros Avanzados</h3>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -798,7 +829,7 @@ const PaymentsTable: React.FC = () => {
                 <input
                   type="date"
                   value={filters.date}
-                  onChange={(e) => setFilters({ ...filters, date: e.target.value })}
+                  onChange={(e) => setFilters({ ...filters, date: e.target.value, dateRange: 'all' })}
                   className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-tent-orange focus:border-transparent"
                 />
 
@@ -817,7 +848,7 @@ const PaymentsTable: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Tabla */}
+      {/* Tabla optimizada */}
       <div className={`bg-white border-x border-gray-200 ${showFilters ? '' : 'rounded-b-xl border-b'}`}>
         <div className="p-1">
           <div className="overflow-x-auto">
@@ -855,13 +886,34 @@ const PaymentsTable: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayments.map(payment => {
-                  // ✅ NUEVO: Mostrar información del tipo de plan en cada fila
-                  const plan = plans.find(p => p.name === payment.plan);
-                  const esDiario = plan ? isPaseDiario(plan.name, plan.price) : false;
-                  
-                  return (
-                    <tr key={payment.id} className="hover:bg-gray-50">
+                {filteredPayments.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center space-y-3">
+                        <Calendar className="text-gray-400" size={48} />
+                        <div>
+                          <p className="text-gray-500 font-medium">No hay pagos para mostrar</p>
+                          <p className="text-gray-400 text-sm">
+                            {filters.dateRange === 'today' 
+                              ? 'No se encontraron pagos para el día de hoy'
+                              : 'No se encontraron pagos que coincidan con los filtros aplicados'
+                            }
+                          </p>
+                        </div>
+                        {filters.dateRange === 'today' && (
+                          <button
+                            onClick={() => setFilters({ ...filters, dateRange: 'all', date: '' })}
+                            className="text-tent-orange hover:text-tent-orange/80 font-medium"
+                          >
+                            Ver todos los pagos
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPayments.map(payment => (
+                    <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {editingPayment === payment.id ? (
                           <input
@@ -894,19 +946,9 @@ const PaymentsTable: React.FC = () => {
                             ))}
                           </select>
                         ) : (
-                          <div className="flex items-center space-x-2">
-                            <span className="px-2 py-1 text-xs font-medium bg-tent-orange/10 text-tent-orange rounded-full">
-                              {payment.plan}
-                            </span>
-                            {/* ✅ NUEVO: Badge de tipo de plan */}
-                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                              esDiario
-                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                                : 'bg-blue-100 text-blue-800 border border-blue-300'
-                            }`}>
-                              {esDiario ? '☀️' : '📅'}
-                            </span>
-                          </div>
+                          <span className="px-2 py-1 text-xs font-medium bg-tent-orange/10 text-tent-orange rounded-full">
+                            {payment.plan}
+                          </span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
@@ -951,18 +993,24 @@ const PaymentsTable: React.FC = () => {
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-tent-orange"
                           />
                         ) : (
-                          payment.date
+                          <div className="flex flex-col">
+                            <span>{payment.date}</span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(payment.date).toLocaleDateString('es-AR', { 
+                                weekday: 'short', 
+                                day: 'numeric', 
+                                month: 'short' 
+                              })}
+                            </span>
+                          </div>
                         )}
                       </td>
-                      {/* ✅ NUEVA: Columna de vigencia */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          esDiario
-                            ? 'bg-yellow-50 text-yellow-700'
-                            : 'bg-blue-50 text-blue-700'
-                        }`}>
-                          {esDiario ? 'Hasta 23:59' : '30 días'}
-                        </span>
+                        <VigenciaStatus 
+                          planName={payment.plan} 
+                          amount={payment.amount} 
+                          date={payment.date} 
+                        />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <button
@@ -989,12 +1037,14 @@ const PaymentsTable: React.FC = () => {
                               <button
                                 onClick={saveEditing}
                                 className="text-tent-green hover:text-tent-green/80 transition-colors p-1 rounded"
+                                title="Guardar cambios"
                               >
                                 <Save size={16} />
                               </button>
                               <button
                                 onClick={cancelEditing}
                                 className="text-red-500 hover:text-red-500/80 transition-colors p-1 rounded"
+                                title="Cancelar edición"
                               >
                                 <X size={16} />
                               </button>
@@ -1008,22 +1058,22 @@ const PaymentsTable: React.FC = () => {
                               >
                                 <Edit2 size={16} />
                               </button>
-                               {isSuperAdmin && (
-                              <button
-                                //onClick={() => setShowDeleteConfirm(payment.id)}
-                              //  className="text-red-500 hover:text-red-600 transition-colors p-1 rounded"
-                               // title="Eliminar pago (Solo Super-Admin)"
-                              >
-                              <Trash2 size={16} />
-                              </button>
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => setShowDeleteConfirm(payment.id)}
+                                  className="text-red-500 hover:text-red-600 transition-colors p-1 rounded"
+                                  title="Eliminar pago (Solo Super-Admin)"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
                               )}
                             </>
                           )}
                         </div>
                       </td>
                     </tr>
-                  );
-                })}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -1081,7 +1131,7 @@ const PaymentsTable: React.FC = () => {
                           className="w-full px-4 py-2 text-left hover:bg-gray-50 flex justify-between items-center"
                         >
                           <span>{student.fullName}</span>
-                          <span className="text-sm text-gray-500">{student.plan}</span>
+                          <span className="text-sm text-gray-500">{student.plan || 'Sin plan'}</span>
                         </button>
                       ))}
                     </div>
@@ -1110,29 +1160,29 @@ const PaymentsTable: React.FC = () => {
                   </select>
                 </div>
 
-                {/* ✅ NUEVO: Información del plan seleccionado */}
-                {selectedPlanInfo && (
+                {/* Información del plan seleccionado */}
+                {getSelectedPlanInfo() && (
                   <div className={`p-3 rounded-lg border ${
-                    selectedPlanInfo.esDiario
+                    getSelectedPlanInfo()?.esDiario
                       ? 'bg-yellow-50 border-yellow-200'
                       : 'bg-blue-50 border-blue-200'
                   }`}>
                     <div className="flex items-start space-x-2">
-                      {selectedPlanInfo.esDiario ? (
+                      {getSelectedPlanInfo()?.esDiario ? (
                         <Sun size={16} className="text-yellow-600 mt-0.5" />
                       ) : (
                         <CalendarDays size={16} className="text-blue-600 mt-0.5" />
                       )}
                       <div className="text-sm">
                         <p className={`font-medium ${
-                          selectedPlanInfo.esDiario ? 'text-yellow-800' : 'text-blue-800'
+                          getSelectedPlanInfo()?.esDiario ? 'text-yellow-800' : 'text-blue-800'
                         }`}>
-                          {selectedPlanInfo.esDiario ? 'Pase Diario' : 'Plan Mensual'}
+                          {getSelectedPlanInfo()?.esDiario ? 'Pase Diario' : 'Plan Mensual'}
                         </p>
                         <p className={`${
-                          selectedPlanInfo.esDiario ? 'text-yellow-700' : 'text-blue-700'
+                          getSelectedPlanInfo()?.esDiario ? 'text-yellow-700' : 'text-blue-700'
                         }`}>
-                          Vigencia: {selectedPlanInfo.vigencia}
+                          Vigencia: {getSelectedPlanInfo()?.vigencia}
                         </p>
                       </div>
                     </div>
@@ -1191,7 +1241,7 @@ const PaymentsTable: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tent-orange focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    {selectedPlanInfo?.esDiario 
+                    {getSelectedPlanInfo()?.esDiario 
                       ? 'Para pases diarios: vigencia hasta las 23:59 de esta fecha'
                       : 'Esta fecha será el inicio de la vigencia del plan (30 días desde esta fecha)'
                     }
@@ -1221,7 +1271,7 @@ const PaymentsTable: React.FC = () => {
                         fullName: '',
                         amount: 0,
                         method: '',
-                        date: new Date().toISOString().split('T')[0],
+                        date: today,
                         facturado: false,
                         plan: '',
                         studentId: '',
@@ -1252,7 +1302,7 @@ const PaymentsTable: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Modal de confirmación para eliminar pago */}
+      {/* Modal de confirmación para eliminar */}
       <AnimatePresence>
         {showDeleteConfirm && (
           <motion.div
