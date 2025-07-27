@@ -16,4 +16,5 @@ router.post('/payments/create-preference', PaymentController.createPaymentPrefer
 router.get('/payments/test-config', PaymentController.testConfiguration);
 router.post('/payments/confirm', PaymentController.confirmPayment);
 
+
 export default router;

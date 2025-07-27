@@ -1,0 +1,187 @@
+[debug] [2025-07-27T22:56:03.430Z] ----------------------------------------------------------------------
+[debug] [2025-07-27T22:56:03.432Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\leand\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy
+[debug] [2025-07-27T22:56:03.432Z] CLI Version:   14.11.1
+[debug] [2025-07-27T22:56:03.432Z] Platform:      win32
+[debug] [2025-07-27T22:56:03.432Z] Node Version:  v22.15.0
+[debug] [2025-07-27T22:56:03.432Z] Time:          Sun Jul 27 2025 19:56:03 GMT-0300 (hora estándar de Argentina)
+[debug] [2025-07-27T22:56:03.432Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-27T22:56:03.563Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-27T22:56:03.564Z] > authorizing via signed-in user (tentregistro@gmail.com)
+[debug] [2025-07-27T22:56:03.564Z] [iam] checking project tentcowork-estudiantes-v2 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2025-07-27T22:56:03.565Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:03.565Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:03.565Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions [none]
+[debug] [2025-07-27T22:56:03.565Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions x-goog-quota-user=projects/tentcowork-estudiantes-v2
+[debug] [2025-07-27T22:56:03.565Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-07-27T22:56:04.503Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions 200
+[debug] [2025-07-27T22:56:04.503Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-07-27T22:56:04.503Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:04.504Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:04.504Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/tentcowork-estudiantes-v2/serviceAccounts/tentcowork-estudiantes-v2@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-07-27T22:56:04.504Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/tentcowork-estudiantes-v2/serviceAccounts/tentcowork-estudiantes-v2@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-07-27T22:56:05.490Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/tentcowork-estudiantes-v2/serviceAccounts/tentcowork-estudiantes-v2@appspot.gserviceaccount.com:testIamPermissions 404
+[debug] [2025-07-27T22:56:05.490Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/tentcowork-estudiantes-v2/serviceAccounts/tentcowork-estudiantes-v2@appspot.gserviceaccount.com:testIamPermissions {"error":{"code":404,"message":"Unknown service account","status":"NOT_FOUND"}}
+[debug] [2025-07-27T22:56:05.491Z] [functions] service account IAM check errored, deploy may fail: Request to https://iam.googleapis.com/v1/projects/tentcowork-estudiantes-v2/serviceAccounts/tentcowork-estudiantes-v2@appspot.gserviceaccount.com:testIamPermissions had HTTP Error: 404, Unknown service account {"name":"FirebaseError","children":[],"context":{"body":{"error":{"code":404,"message":"Unknown service account","status":"NOT_FOUND"}},"response":{"statusCode":404}},"exit":1,"message":"Request to https://iam.googleapis.com/v1/projects/tentcowork-estudiantes-v2/serviceAccounts/tentcowork-estudiantes-v2@appspot.gserviceaccount.com:testIamPermissions had HTTP Error: 404, Unknown service account","status":404}
+[debug] [2025-07-27T22:56:05.492Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:05.492Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:05.493Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/tentcowork-estudiantes-v2 [none]
+[debug] [2025-07-27T22:56:05.876Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/tentcowork-estudiantes-v2 200
+[debug] [2025-07-27T22:56:05.876Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/tentcowork-estudiantes-v2 {"projectId":"tentcowork-estudiantes-v2","projectNumber":"136926815624","displayName":"TentCowork-Estudiantes-v2","name":"projects/tentcowork-estudiantes-v2","resources":{"hostingSite":"tentcowork-estudiantes-v2"},"state":"ACTIVE","etag":"1_f64d155e-06e0-4c70-b568-c8c7ffb6728b"}
+[info] 
+[info] === Deploying to 'tentcowork-estudiantes-v2'...
+[info] 
+[info] i  deploying functions, hosting 
+[debug] [2025-07-27T22:56:05.884Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:05.884Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:05.884Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2 [none]
+[debug] [2025-07-27T22:56:06.122Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2 200
+[debug] [2025-07-27T22:56:06.122Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2 {"projectNumber":"136926815624","projectId":"tentcowork-estudiantes-v2","lifecycleState":"ACTIVE","name":"TentCowork-Estudiantes-v2","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-06-28T23:33:11.968537Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-07-27T22:56:06.127Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:06.127Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:06.128Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/tentcowork-estudiantes-v2/adminSdkConfig [none]
+[debug] [2025-07-27T22:56:06.507Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/tentcowork-estudiantes-v2/adminSdkConfig 200
+[debug] [2025-07-27T22:56:06.507Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/tentcowork-estudiantes-v2/adminSdkConfig {"projectId":"tentcowork-estudiantes-v2","storageBucket":"tentcowork-estudiantes-v2.firebasestorage.app"}
+[debug] [2025-07-27T22:56:06.508Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:06.508Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:06.508Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/tentcowork-estudiantes-v2/configs [none]
+[debug] [2025-07-27T22:56:07.542Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/tentcowork-estudiantes-v2/configs 200
+[debug] [2025-07-27T22:56:07.542Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/tentcowork-estudiantes-v2/configs {}
+[debug] [2025-07-27T22:56:07.543Z] Validating nodejs source
+[debug] [2025-07-27T22:56:08.265Z] > [functions] package.json contents: {
+  "name": "functions",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "npm run build && cd .. && firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@types/node-fetch": "^2.6.4",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.4.0",
+    "firebase-functions": "^6.4.0",
+    "mercadopago": "^2.0.15",
+    "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.14",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.3"
+  }
+}
+[debug] [2025-07-27T22:56:08.266Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase default to determine what to deploy 
+[debug] [2025-07-27T22:56:08.268Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-07-27T22:56:08.280Z] Found firebase-functions binary at 'C:\Users\leand\Desktop\tent\sistema estudiantes v2\tent-estudiantes-v2\tent-estudiantes-v2\functions\node_modules\.bin\firebase-functions'
+[info] Serving at port 8090
+
+[info] [dotenv@17.2.0] injecting env (3) from .env (tip: ⚙️  enable debug logging with { debug: true })
+
+[info] 🔧 Inicializando Mercado Pago...
+
+[info] Token presente: true
+✅ Mercado Pago inicializado correctamente
+  - Cliente: true
+  - Preference: true
+  - Payment: true
+
+[info] 🔧 Inicializando Mercado Pago...
+
+[info] Token presente: true
+✅ Mercado Pago inicializado correctamente
+  - Cliente: true
+  - Preference: true
+
+[info]   - Payment: true
+
+[debug] [2025-07-27T22:56:08.815Z] Got response from /__/functions.yaml {"endpoints":{"backend":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"backend"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[info] i  extensions: ensuring required API firebaseextensions.googleapis.com is enabled... 
+[debug] [2025-07-27T22:56:12.851Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-27T22:56:12.851Z] > authorizing via signed-in user (tentregistro@gmail.com)
+[debug] [2025-07-27T22:56:12.851Z] [iam] checking project tentcowork-estudiantes-v2 for permissions ["firebase.projects.get","firebaseextensions.instances.list"]
+[debug] [2025-07-27T22:56:12.851Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:12.851Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:12.851Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions [none]
+[debug] [2025-07-27T22:56:12.851Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions x-goog-quota-user=projects/tentcowork-estudiantes-v2
+[debug] [2025-07-27T22:56:12.851Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions {"permissions":["firebase.projects.get","firebaseextensions.instances.list"]}
+[debug] [2025-07-27T22:56:13.770Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions 200
+[debug] [2025-07-27T22:56:13.771Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2:testIamPermissions {"permissions":["firebase.projects.get","firebaseextensions.instances.list"]}
+[debug] [2025-07-27T22:56:13.771Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:13.771Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:13.771Z] >>> [apiv2][query] GET https://firebaseextensions.googleapis.com/v1beta/projects/tentcowork-estudiantes-v2/instances pageSize=100&pageToken=
+[debug] [2025-07-27T22:56:14.911Z] <<< [apiv2][status] GET https://firebaseextensions.googleapis.com/v1beta/projects/tentcowork-estudiantes-v2/instances 200
+[debug] [2025-07-27T22:56:14.911Z] <<< [apiv2][body] GET https://firebaseextensions.googleapis.com/v1beta/projects/tentcowork-estudiantes-v2/instances {}
+[info] i  functions: Loaded environment variables from .env. 
+[info] i  functions: preparing functions directory for uploading... 
+[info] i  functions: packaged C:\Users\leand\Desktop\tent\sistema estudiantes v2\tent-estudiantes-v2\tent-estudiantes-v2\functions (71.06 KB) for uploading 
+[debug] [2025-07-27T22:56:14.997Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:14.997Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:14.997Z] >>> [apiv2][query] GET https://cloudfunctions.googleapis.com/v1/projects/tentcowork-estudiantes-v2/locations/-/functions [none]
+[debug] [2025-07-27T22:56:16.030Z] <<< [apiv2][status] GET https://cloudfunctions.googleapis.com/v1/projects/tentcowork-estudiantes-v2/locations/-/functions 200
+[debug] [2025-07-27T22:56:16.030Z] <<< [apiv2][body] GET https://cloudfunctions.googleapis.com/v1/projects/tentcowork-estudiantes-v2/locations/-/functions {}
+[debug] [2025-07-27T22:56:16.031Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:16.031Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:16.031Z] >>> [apiv2][query] GET https://cloudfunctions.googleapis.com/v2/projects/tentcowork-estudiantes-v2/locations/-/functions filter=environment%3D%22GEN_2%22
+[debug] [2025-07-27T22:56:17.201Z] <<< [apiv2][status] GET https://cloudfunctions.googleapis.com/v2/projects/tentcowork-estudiantes-v2/locations/-/functions 200
+[debug] [2025-07-27T22:56:17.201Z] <<< [apiv2][body] GET https://cloudfunctions.googleapis.com/v2/projects/tentcowork-estudiantes-v2/locations/-/functions {"functions":[{"name":"projects/tentcowork-estudiantes-v2/locations/us-central1/functions/backend","buildConfig":{"build":"projects/136926815624/locations/us-central1/builds/58e83539-1744-427e-9d3a-8a40d7638f3c","runtime":"nodejs20","entryPoint":"backend","source":{"storageSource":{"bucket":"gcf-v2-sources-136926815624-us-central1","object":"backend/function-source.zip","generation":"1753656887175607"}},"environmentVariables":{"GOOGLE_NODE_RUN_SCRIPTS":""},"dockerRepository":"projects/tentcowork-estudiantes-v2/locations/us-central1/repositories/gcf-artifacts","sourceProvenance":{"resolvedStorageSource":{"bucket":"gcf-v2-sources-136926815624-us-central1","object":"backend/function-source.zip","generation":"1753656887175607"}},"dockerRegistry":"ARTIFACT_REGISTRY","serviceAccount":"projects/tentcowork-estudiantes-v2/serviceAccounts/136926815624-compute@developer.gserviceaccount.com","automaticUpdatePolicy":{}},"serviceConfig":{"service":"projects/tentcowork-estudiantes-v2/locations/us-central1/services/backend","timeoutSeconds":60,"environmentVariables":{"MP_ACCESS_TOKEN":"APP_USR-1803353237783539-051414-9223422c335471c8272b78e78a02246e-1386103905","MP_PUBLIC_KEY":"APP_USR-5d91eb0b-a07f-42b6-9a31-3c0e577e7f82","BACKEND_URL":"https://backend-h2yatjzgba-uc.a.run.app/","FIREBASE_CONFIG":"{\"projectId\":\"tentcowork-estudiantes-v2\",\"storageBucket\":\"tentcowork-estudiantes-v2.firebasestorage.app\"}","GCLOUD_PROJECT":"tentcowork-estudiantes-v2","EVENTARC_CLOUD_EVENT_SOURCE":"projects/tentcowork-estudiantes-v2/locations/us-central1/services/backend","FUNCTION_TARGET":"backend","LOG_EXECUTION_ID":"true"},"maxInstanceCount":20,"ingressSettings":"ALLOW_ALL","uri":"https://backend-h2yatjzgba-uc.a.run.app","serviceAccountEmail":"136926815624-compute@developer.gserviceaccount.com","availableMemory":"256Mi","allTrafficOnLatestRevision":true,"revision":"backend-00033-kad","maxInstanceRequestConcurrency":80,"availableCpu":"1"},"state":"ACTIVE","updateTime":"2025-07-27T22:55:42.922763583Z","labels":{"deployment-tool":"cli-firebase","firebase-functions-hash":"22e7489fb79d3cbbe5ff6c04f640fddda306fbed"},"environment":"GEN_2","url":"https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend","createTime":"2025-07-21T17:16:12.258452020Z","satisfiesPzi":true}]}
+[info] i  functions: ensuring required API run.googleapis.com is enabled... 
+[info] i  functions: ensuring required API eventarc.googleapis.com is enabled... 
+[info] i  functions: ensuring required API pubsub.googleapis.com is enabled... 
+[info] i  functions: ensuring required API storage.googleapis.com is enabled... 
+[info] i  functions: generating the service identity for pubsub.googleapis.com... 
+[debug] [2025-07-27T22:56:17.208Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:17.208Z] Checked if tokens are valid: true, expires at: 1753660463890
+[info] i  functions: generating the service identity for eventarc.googleapis.com... 
+[debug] [2025-07-27T22:56:17.209Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:17.209Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:17.209Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/pubsub.googleapis.com:generateServiceIdentity [none]
+[debug] [2025-07-27T22:56:17.209Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/pubsub.googleapis.com:generateServiceIdentity x-goog-quota-user=projects/136926815624
+[debug] [2025-07-27T22:56:17.209Z] >>> [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/pubsub.googleapis.com:generateServiceIdentity {}
+[debug] [2025-07-27T22:56:17.211Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/eventarc.googleapis.com:generateServiceIdentity [none]
+[debug] [2025-07-27T22:56:17.211Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/eventarc.googleapis.com:generateServiceIdentity x-goog-quota-user=projects/136926815624
+[debug] [2025-07-27T22:56:17.211Z] >>> [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/eventarc.googleapis.com:generateServiceIdentity {}
+[debug] [2025-07-27T22:56:18.311Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/pubsub.googleapis.com:generateServiceIdentity 200
+[debug] [2025-07-27T22:56:18.311Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/pubsub.googleapis.com:generateServiceIdentity {"name":"operations/finished.DONE_OPERATION","done":true,"response":{"@type":"type.googleapis.com/google.api.serviceusage.v1beta1.ServiceIdentity","email":"service-136926815624@gcp-sa-pubsub.iam.gserviceaccount.com","uniqueId":"118417518725174664083"}}
+[debug] [2025-07-27T22:56:18.372Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/eventarc.googleapis.com:generateServiceIdentity 200
+[debug] [2025-07-27T22:56:18.372Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/136926815624/services/eventarc.googleapis.com:generateServiceIdentity {"name":"operations/finished.DONE_OPERATION","done":true,"response":{"@type":"type.googleapis.com/google.api.serviceusage.v1beta1.ServiceIdentity","email":"service-136926815624@gcp-sa-eventarc.iam.gserviceaccount.com","uniqueId":"105332887405398144118"}}
+[debug] [2025-07-27T22:56:18.376Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:18.376Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:18.376Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2 [none]
+[debug] [2025-07-27T22:56:18.625Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2 200
+[debug] [2025-07-27T22:56:18.625Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/tentcowork-estudiantes-v2 {"projectNumber":"136926815624","projectId":"tentcowork-estudiantes-v2","lifecycleState":"ACTIVE","name":"TentCowork-Estudiantes-v2","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-06-28T23:33:11.968537Z"}
+[debug] [2025-07-27T22:56:18.626Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:18.626Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:18.626Z] >>> [apiv2][query] GET https://compute.googleapis.com/compute/v1/projects/136926815624 [none]
+[debug] [2025-07-27T22:56:19.160Z] <<< [apiv2][status] GET https://compute.googleapis.com/compute/v1/projects/136926815624 200
+[debug] [2025-07-27T22:56:19.160Z] <<< [apiv2][body] GET https://compute.googleapis.com/compute/v1/projects/136926815624 {"kind":"compute#project","id":"4302821291013184905","creationTimestamp":"2025-07-17T18:29:10.978-07:00","name":"tentcowork-estudiantes-v2","commonInstanceMetadata":{"kind":"compute#metadata","fingerprint":"qzzXUksIQbI="},"quotas":[{"metric":"SNAPSHOTS","limit":1000,"usage":0},{"metric":"NETWORKS","limit":5,"usage":1},{"metric":"FIREWALLS","limit":100,"usage":4},{"metric":"IMAGES","limit":100,"usage":0},{"metric":"STATIC_ADDRESSES","limit":8,"usage":0},{"metric":"ROUTES","limit":200,"usage":0},{"metric":"FORWARDING_RULES","limit":15,"usage":0},{"metric":"TARGET_POOLS","limit":50,"usage":0},{"metric":"HEALTH_CHECKS","limit":75,"usage":0},{"metric":"IN_USE_ADDRESSES","limit":8,"usage":0},{"metric":"TARGET_INSTANCES","limit":50,"usage":0},{"metric":"TARGET_HTTP_PROXIES","limit":10,"usage":0},{"metric":"URL_MAPS","limit":10,"usage":0},{"metric":"BACKEND_SERVICES","limit":50,"usage":0},{"metric":"INSTANCE_TEMPLATES","limit":100,"usage":0},{"metric":"TARGET_VPN_GATEWAYS","limit":5,"usage":0},{"metric":"VPN_TUNNELS","limit":10,"usage":0},{"metric":"BACKEND_BUCKETS","limit":3,"usage":0},{"metric":"ROUTERS","limit":10,"usage":0},{"metric":"TARGET_SSL_PROXIES","limit":10,"usage":0},{"metric":"TARGET_HTTPS_PROXIES","limit":10,"usage":0},{"metric":"SSL_CERTIFICATES","limit":10,"usage":0},{"metric":"SUBNETWORKS","limit":100,"usage":0},{"metric":"TARGET_TCP_PROXIES","limit":10,"usage":0},{"metric":"CPUS_ALL_REGIONS","limit":16,"usage":0},{"metric":"SECURITY_POLICIES","limit":10,"usage":0},{"metric":"SECURITY_POLICY_RULES","limit":100,"usage":0},{"metric":"XPN_SERVICE_PROJECTS","limit":1000,"usage":0},{"metric":"PACKET_MIRRORINGS","limit":20,"usage":0},{"metric":"NETWORK_ENDPOINT_GROUPS","limit":100,"usage":0},{"metric":"INTERCONNECTS","limit":6,"usage":0},{"metric":"SSL_POLICIES","limit":10,"usage":0},{"metric":"GLOBAL_INTERNAL_ADDRESSES","limit":5000,"usage":0},{"metric":"VPN_GATEWAYS","limit":5,"usage":0},{"metric":"MACHINE_IMAGES","limit":100,"usage":0},{"metric":"SECURITY_POLICY_CEVAL_RULES","limit":20,"usage":0},{"metric":"GPUS_ALL_REGIONS","limit":0,"usage":0},{"metric":"EXTERNAL_VPN_GATEWAYS","limit":5,"usage":0},{"metric":"PUBLIC_ADVERTISED_PREFIXES","limit":1,"usage":0},{"metric":"PUBLIC_DELEGATED_PREFIXES","limit":10,"usage":0},{"metric":"STATIC_BYOIP_ADDRESSES","limit":128,"usage":0},{"metric":"NETWORK_FIREWALL_POLICIES","limit":10,"usage":0},{"metric":"INTERNAL_TRAFFIC_DIRECTOR_FORWARDING_RULES","limit":15,"usage":0},{"metric":"GLOBAL_EXTERNAL_MANAGED_FORWARDING_RULES","limit":15,"usage":0},{"metric":"GLOBAL_INTERNAL_MANAGED_BACKEND_SERVICES","limit":50,"usage":0},{"metric":"GLOBAL_EXTERNAL_MANAGED_BACKEND_SERVICES","limit":50,"usage":0},{"metric":"GLOBAL_EXTERNAL_PROXY_LB_BACKEND_SERVICES","limit":50,"usage":0},{"metric":"GLOBAL_INTERNAL_TRAFFIC_DIRECTOR_BACKEND_SERVICES","limit":250,"usage":0}],"selfLink":"https://www.googleapis.com/compute/v1/projects/tentcowork-estudiantes-v2","defaultServiceAccount":"136926815624-compute@developer.gserviceaccount.com","xpnProjectStatus":"UNSPECIFIED_XPN_PROJECT_STATUS","defaultNetworkTier":"PREMIUM","vmDnsSetting":"ZONAL_ONLY","cloudArmorTier":"CA_STANDARD"}
+[debug] [2025-07-27T22:56:19.165Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:19.165Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:19.166Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/tentcowork-estudiantes-v2/versions [none]
+[debug] [2025-07-27T22:56:19.166Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/tentcowork-estudiantes-v2/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2025-07-27T22:56:20.573Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/tentcowork-estudiantes-v2/versions 200
+[debug] [2025-07-27T22:56:20.573Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/tentcowork-estudiantes-v2/versions {"name":"projects/136926815624/sites/tentcowork-estudiantes-v2/versions/84fa4de53f1ffd92","status":"CREATED","config":{},"labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2025-07-27T22:56:20.574Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:20.574Z] Checked if tokens are valid: true, expires at: 1753660463890
+[debug] [2025-07-27T22:56:20.574Z] >>> [apiv2][query] GET https://cloudbilling.googleapis.com/v1/projects/tentcowork-estudiantes-v2/billingInfo [none]

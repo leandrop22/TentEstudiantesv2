@@ -64,7 +64,18 @@ function ensureMPInitialized(): boolean {
   return mpInitialized;
 }
 
-export class PaymentController {
+class PaymentController {
+  /**
+   * Test simple para debugging
+   */
+  static async testConfirmSimple(req: Request, res: Response): Promise<void> {
+    res.json({ 
+      message: 'Test confirm simple working',
+      timestamp: new Date().toISOString(),
+      body: req.body
+    });
+  }
+
 
   /**
    * 🎯 CONFIRMAR PAGO DESDE FRONTEND
@@ -126,8 +137,11 @@ export class PaymentController {
           return;
         }
 
-        // Si no existe, crear el pago en nuestra BD
-        const studentId = externalReference || mpPaymentResponse.external_reference;
+        // Extraer studentId y plan del external_reference
+        const referenceData = (externalReference || mpPaymentResponse.external_reference || '').split('|');
+        const studentId = referenceData[0];
+        const planFromReference = referenceData[1];
+        
         if (!studentId) {
           res.status(400).json({ 
             success: false, 
@@ -147,8 +161,12 @@ export class PaymentController {
         }
 
         const studentData = studentDoc.data();
-        const planName = studentData?.plan || 'Plan no especificado';
+        // Usar el plan del external_reference, luego el del estudiante, luego default
+        const planName = planFromReference || studentData?.plan || 'Plan no especificado';
         const planPrice = mpPaymentResponse.transaction_amount || 0;
+        
+        console.log('Plan extraído:', planName);
+        console.log('Precio del plan:', planPrice);
         
         // ✅ CALCULAR FECHAS SEGÚN TIPO DE PLAN (igual que PaymentsTable)
         const isPaseDiario = (planName: string, price: number = 0) => {
@@ -852,3 +870,6 @@ export class PaymentController {
     }
   } 
 }
+
+// Exportar al final del archivo
+export { PaymentController };

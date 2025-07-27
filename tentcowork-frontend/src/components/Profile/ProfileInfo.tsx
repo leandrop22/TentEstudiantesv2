@@ -141,16 +141,16 @@ export default function ProfileInfo() {
         }
         
         // Limpiar URL y redirigir al perfil
-        navigate('/perfil', { replace: true });
+        navigate('/profile', { replace: true });
       } else {
         setMensaje(`❌ ${result.message || 'Error al confirmar el pago'}`);
-        navigate('/perfil', { replace: true });
+        navigate('/profile', { replace: true });
       }
       
     } catch (error: any) {
       console.error('❌ Error confirmando pago:', error);
       setMensaje(`❌ Error al confirmar el pago: ${error.message}. Por favor contactanos.`);
-      navigate('/perfil', { replace: true });
+      navigate('/profile', { replace: true });
     } finally {
       setPaymentLoading(false);
     }
@@ -179,7 +179,7 @@ export default function ProfileInfo() {
         );
       } else {
         setMensaje('❌ Hubo un problema al procesar tu pago.');
-        navigate('/perfil', { replace: true });
+        navigate('/profile', { replace: true });
       }
     }
   }, [location.pathname, params]);
