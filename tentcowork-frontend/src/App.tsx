@@ -27,6 +27,10 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/admin/*" element={<AdminLayout />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/payment/success" element={<Profile />} />
+          <Route path="/payment/failure" element={<Profile />} />
+          <Route path="/payment/pending" element={<Profile />} />
+          
         </Routes>
       </AuthProvider>
    

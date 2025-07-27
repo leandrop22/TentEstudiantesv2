@@ -1,8 +1,6 @@
 // src/controllers/paymentController.ts
 import { Request, Response } from 'express';
 
-
-
 // 🔧 IMPORTAR MERCADO PAGO VERSIÓN NUEVA
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { admin, db } from '../config/firebase';
@@ -67,6 +65,191 @@ function ensureMPInitialized(): boolean {
 }
 
 export class PaymentController {
+
+  /**
+   * 🎯 CONFIRMAR PAGO DESDE FRONTEND
+   * Endpoint llamado desde ProfileInfo cuando el usuario vuelve de Mercado Pago
+   */
+  static async confirmPayment(req: Request, res: Response): Promise<void> {
+    try {
+      console.log('=== CONFIRMANDO PAGO DESDE FRONTEND ===');
+      console.log('Body recibido:', req.body);
+      
+      const { paymentId, collectionId, status, externalReference } = req.body;
+      
+      if (!paymentId && !collectionId) {
+        res.status(400).json({ 
+          success: false, 
+          message: 'No se proporcionó payment_id ni collection_id' 
+        });
+        return;
+      }
+
+      // Verificar que MP esté inicializado
+      if (!ensureMPInitialized() || !payment) {
+        console.log('❌ Mercado Pago no está inicializado');
+        res.status(500).json({ 
+          success: false,
+          message: 'Error de configuración del servidor'
+        });
+        return;
+      }
+
+      // Obtener información del pago desde MP
+      const mpPaymentId = paymentId || collectionId;
+      const numericPaymentId = parseInt(mpPaymentId);
+      
+      if (isNaN(numericPaymentId)) {
+        res.status(400).json({ 
+          success: false, 
+          message: 'ID de pago inválido' 
+        });
+        return;
+      }
+
+      console.log('Obteniendo pago de MP con ID:', numericPaymentId);
+      const mpPaymentResponse = await payment.get({ id: numericPaymentId });
+      
+      console.log('Respuesta de MP:', JSON.stringify(mpPaymentResponse, null, 2));
+
+      if (mpPaymentResponse.status === 'approved') {
+        // Buscar si ya existe el pago en nuestra BD
+        const existingPayment = await PaymentController.findPaymentByMercadoPagoId(mpPaymentId);
+        
+        if (existingPayment) {
+          console.log('✅ Pago ya existe y está procesado');
+          res.json({ 
+            success: true, 
+            message: 'Pago ya confirmado anteriormente',
+            paymentId: existingPayment.id
+          });
+          return;
+        }
+
+        // Si no existe, crear el pago en nuestra BD
+        const studentId = externalReference || mpPaymentResponse.external_reference;
+        if (!studentId) {
+          res.status(400).json({ 
+            success: false, 
+            message: 'No se pudo identificar al estudiante' 
+          });
+          return;
+        }
+
+        // Obtener datos del estudiante
+        const studentDoc = await db.collection('students').doc(studentId).get();
+        if (!studentDoc.exists) {
+          res.status(404).json({ 
+            success: false, 
+            message: 'Estudiante no encontrado' 
+          });
+          return;
+        }
+
+        const studentData = studentDoc.data();
+        const planName = studentData?.plan || 'Plan no especificado';
+        const planPrice = mpPaymentResponse.transaction_amount || 0;
+        
+        // ✅ CALCULAR FECHAS SEGÚN TIPO DE PLAN (igual que PaymentsTable)
+        const isPaseDiario = (planName: string, price: number = 0) => {
+          const nombre = planName.toLowerCase();
+          return nombre.includes('diario') || 
+                 nombre.includes('día') || 
+                 nombre.includes('day') ||
+                 (nombre.includes('pase') && (nombre.includes('diario') || nombre.includes('día'))) ||
+                 price <= 8000;
+        };
+
+        const calcularFechasPlan = (planName: string, price: number, fechaPago: Date) => {
+          let fechaDesde: Date;
+          let fechaHasta: Date;
+
+          if (isPaseDiario(planName, price)) {
+            // Para pase diario: desde el momento del pago hasta las 23:59:59 del mismo día
+            fechaDesde = new Date(fechaPago);
+            fechaHasta = new Date(fechaPago);
+            fechaHasta.setHours(23, 59, 59, 999);
+          } else {
+            // Para planes mensuales: desde la fecha del pago hasta 30 días después
+            fechaDesde = new Date(fechaPago);
+            fechaHasta = new Date(fechaPago);
+            fechaHasta.setDate(fechaHasta.getDate() + 30);
+          }
+
+          return {
+            fechaDesde: admin.firestore.Timestamp.fromDate(fechaDesde),
+            fechaHasta: admin.firestore.Timestamp.fromDate(fechaHasta)
+          };
+        };
+
+        // Calcular fechas según el tipo de plan
+        const fechaPago = new Date(); // Fecha actual como confirmación
+        const { fechaDesde, fechaHasta } = calcularFechasPlan(planName, planPrice, fechaPago);
+        
+        // Crear el registro de pago
+        const paymentRecord = {
+          studentId: studentId,
+          fullName: studentData?.fullName || 'Nombre no disponible',
+          amount: planPrice,
+          method: 'Mercado Pago Hospedado',
+          date: fechaPago.toISOString().split('T')[0],
+          facturado: true,
+          plan: planName,
+          mercadoPagoId: mpPaymentId,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        const paymentDocRef = await db.collection('payments').add(paymentRecord);
+        console.log('✅ Pago creado en BD:', paymentDocRef.id);
+
+        // Actualizar membresía del estudiante con fechas específicas según el plan
+        const studentRef = db.collection('students').doc(studentId);
+        const studentUpdateData: any = {
+          plan: planName,
+          'membresia.nombre': planName,
+          'membresia.estado': 'activa',
+          'membresia.montoPagado': planPrice,
+          'membresia.medioPago': 'Mercado Pago Hospedado',
+          'membresia.fechaDesde': fechaDesde,
+          'membresia.fechaHasta': fechaHasta,
+          activo: true
+        };
+        
+        console.log('Actualizando estudiante con fechas específicas:');
+        console.log('  - Plan:', planName);
+        console.log('  - Es pase diario:', isPaseDiario(planName, planPrice));
+        console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
+        console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
+        
+        await studentRef.update(studentUpdateData);
+        console.log('✅ Membresía del estudiante activada con fechas correctas');
+
+        res.json({ 
+          success: true, 
+          message: 'Pago confirmado y membresía activada',
+          paymentId: paymentDocRef.id,
+          vigencia: isPaseDiario(planName, planPrice) 
+            ? 'hasta las 23:59 de hoy' 
+            : '30 días desde hoy'
+        });
+
+      } else {
+        console.log('❌ El pago no está aprobado. Estado:', mpPaymentResponse.status);
+        res.json({ 
+          success: false, 
+          message: `Pago no aprobado. Estado: ${mpPaymentResponse.status}` 
+        });
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Error confirmando pago:', error);
+      res.status(500).json({ 
+        success: false,
+        message: 'Error interno del servidor',
+        details: error.message 
+      });
+    }
+  }
 
   /**
    * 🎯 WEBHOOK DE MERCADO PAGO
@@ -178,9 +361,12 @@ export class PaymentController {
         studentEmail: studentEmail || 'no-email'
       });
 
-      // ✅ VERIFICAR URLs CON FALLBACKS
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+      //urls producción 
+      const frontendUrl = process.env.FRONTEND_URL || 'https://estudiantes.tentcowork.com';
+      const backendUrl = process.env.BACKEND_URL || 'https://backend-h2yatjzgba-uc.a.run.app';
+      // urls desarrollo  
+     // const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      //const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
 
       // 🔧 CREAR LA PREFERENCIA CON CONFIGURACIÓN QUE FUNCIONA
       const preferenceData = {
@@ -485,7 +671,7 @@ export class PaymentController {
 
   /**
    * Activa el plan del estudiante cuando el pago es aprobado
-   * USA EXACTAMENTE LA MISMA LÓGICA QUE PaymentsTable
+   * USA EXACTAMENTE LA MISMA LÓGICA QUE PaymentsTable con fechas específicas por tipo de plan
    */
   private static async activateStudentPlan(
     payment: PaymentRecord, 
@@ -501,6 +687,38 @@ export class PaymentController {
       const confirmedAmount = mpPayment.transaction_amount || payment.amount;
       const paymentId = mpPayment.id?.toString() || 'unknown';
 
+      // ✅ CALCULAR FECHAS SEGÚN TIPO DE PLAN (igual que confirmPayment)
+      const isPaseDiario = (planName: string, price: number = 0) => {
+        const nombre = planName.toLowerCase();
+        return nombre.includes('diario') || 
+               nombre.includes('día') || 
+               nombre.includes('day') ||
+               (nombre.includes('pase') && (nombre.includes('diario') || nombre.includes('día'))) ||
+               price <= 8000;
+      };
+
+      const calcularFechasPlan = (planName: string, price: number, fechaPago: Date) => {
+        let fechaDesde: Date;
+        let fechaHasta: Date;
+
+        if (isPaseDiario(planName, price)) {
+          // Para pase diario: desde el momento del pago hasta las 23:59:59 del mismo día
+          fechaDesde = new Date(fechaPago);
+          fechaHasta = new Date(fechaPago);
+          fechaHasta.setHours(23, 59, 59, 999);
+        } else {
+          // Para planes mensuales: desde la fecha del pago hasta 30 días después
+          fechaDesde = new Date(fechaPago);
+          fechaHasta = new Date(fechaPago);
+          fechaHasta.setDate(fechaHasta.getDate() + 30);
+        }
+
+        return {
+          fechaDesde: admin.firestore.Timestamp.fromDate(fechaDesde),
+          fechaHasta: admin.firestore.Timestamp.fromDate(fechaHasta)
+        };
+      };
+
       // 1. Actualizar el pago en la colección 'payments'
       const paymentUpdateData: Partial<PaymentRecord> = {
         facturado: true, // ✅ Marcar como facturado cuando MP confirma el pago
@@ -511,21 +729,20 @@ export class PaymentController {
       await db.collection('payments').doc(payment.id).update(paymentUpdateData);
       console.log('✅ Pago actualizado como facturado');
 
-      // 2. Actualizar el estudiante - EXACTAMENTE IGUAL QUE EN PaymentsTable
+      // 2. Actualizar el estudiante con fechas específicas según el plan
       const studentRef = db.collection('students').doc(payment.studentId);
       
-      // Calcular fechas de vigencia usando Timestamp (igual que PaymentsTable)
+      // Calcular fechas de vigencia usando la misma lógica que confirmPayment
       const fechaPago = new Date(); // Usar la fecha actual como fecha de pago confirmado
-      const fechaDesde = admin.firestore.Timestamp.fromDate(fechaPago);
-      const fechaHasta = admin.firestore.Timestamp.fromDate(
-        new Date(fechaPago.getTime() + 30 * 24 * 60 * 60 * 1000) // Un mes después
-      );
+      const { fechaDesde, fechaHasta } = calcularFechasPlan(payment.plan, confirmedAmount, fechaPago);
       
       console.log('Fechas calculadas:');
+      console.log('  - Plan:', payment.plan);
+      console.log('  - Es pase diario:', isPaseDiario(payment.plan, confirmedAmount));
       console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
       console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
       
-      // Actualizar el estudiante - MISMA ESTRUCTURA QUE PaymentsTable
+      // Actualizar el estudiante - MISMA ESTRUCTURA QUE confirmPayment
       const studentUpdateData: any = {
         plan: payment.plan,
         'membresia.nombre': payment.plan,
@@ -633,5 +850,5 @@ export class PaymentController {
       console.error('Error creating notification:', error);
       // No lanzar error para no afectar el flujo principal
     }
-  }
+  } 
 }

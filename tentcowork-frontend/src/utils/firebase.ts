@@ -5,7 +5,10 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 
-
+//console.log('🔍 Debug Firebase Variables:');
+//console.log('PROJECT_ID:', import.meta.env.VITE_FIREBASE_PROJECT_ID);
+//console.log('API_KEY existe:', !!import.meta.env.VITE_FIREBASE_API_KEY);
+//console.log('AUTH_DOMAIN:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
 
 
 

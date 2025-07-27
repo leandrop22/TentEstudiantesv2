@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { db, auth } from '../../utils/firebase';
 import { collection, query, where, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'; // ✅ AÑADIDO
 
 // Importar los subcomponentes
 import EditProfile from './EditProfile';
@@ -48,6 +48,9 @@ interface Estudiante {
 export default function ProfileInfo() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ AÑADIDO
+  const [params] = useSearchParams(); // ✅ AÑADIDO
+  
   const [estudiante, setEstudiante] = useState<Estudiante | null>(null);
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -58,35 +61,31 @@ export default function ProfileInfo() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ NUEVA FUNCIÓN: Detectar si es pase diario
-  const isPaseDiario = (planName: string) => {
+  // ✅ FUNCIÓN: Detectar si es pase diario
+  const isPaseDiario = (planName: string, price: number = 0) => {
     const nombre = planName.toLowerCase();
     return nombre.includes('diario') || 
            nombre.includes('día') || 
            nombre.includes('day') ||
-           nombre.includes('pase') && (nombre.includes('diario') || nombre.includes('día'));
+           (nombre.includes('pase') && (nombre.includes('diario') || nombre.includes('día'))) ||
+           price <= 8000;
   };
 
-  // ✅ NUEVA FUNCIÓN: Calcular fechas según tipo de plan
-  const calcularFechasPlan = (plan: Plan) => {
-    const ahora = new Date();
+  // ✅ FUNCIÓN: Calcular fechas según tipo de plan (igual que PaymentsTable)
+  const calcularFechasPlan = (planName: string, price: number, fechaPago: Date) => {
     let fechaDesde: Date;
     let fechaHasta: Date;
 
-    if (isPaseDiario(plan.name)) {
-      // Para pase diario: desde ahora hasta las 23:59:59 del mismo día
-      fechaDesde = new Date(ahora);
-      fechaHasta = new Date(ahora);
-      fechaHasta.setHours(23, 59, 59, 999); // Hasta las 23:59:59.999
-      
-     
+    if (isPaseDiario(planName, price)) {
+      // Para pase diario: desde el momento del pago hasta las 23:59:59 del mismo día
+      fechaDesde = new Date(fechaPago);
+      fechaHasta = new Date(fechaPago);
+      fechaHasta.setHours(23, 59, 59, 999);
     } else {
-      // Para planes mensuales: desde ahora hasta dentro de 30 días
-      fechaDesde = new Date(ahora);
-      fechaHasta = new Date(ahora);
-      fechaHasta.setDate(fechaHasta.getDate() + 30); // 30 días
-      
-    
+      // Para planes mensuales: desde la fecha del pago hasta 30 días después
+      fechaDesde = new Date(fechaPago);
+      fechaHasta = new Date(fechaPago);
+      fechaHasta.setDate(fechaHasta.getDate() + 30);
     }
 
     return {
@@ -94,6 +93,96 @@ export default function ProfileInfo() {
       fechaHasta: Timestamp.fromDate(fechaHasta)
     };
   };
+
+  // ✅ NUEVA FUNCIÓN: Confirmar pago desde Mercado Pago
+  const confirmarPago = async (paymentId: string, collectionId?: string, externalReference?: string) => {
+    setPaymentLoading(true);
+    try {
+      console.log('=== CONFIRMANDO PAGO DESDE FRONTEND ===');
+      console.log('Payment ID:', paymentId);
+      console.log('Collection ID:', collectionId);
+      console.log('External Reference:', externalReference);
+
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/payments/confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paymentId: paymentId || collectionId,
+          collectionId,
+          externalReference,
+          status: params.get('status')
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Error ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Respuesta del backend:', result);
+
+      if (result.success) {
+        setMensaje('✅ ¡Pago confirmado! Tu membresía ha sido activada exitosamente.');
+        
+        // Recargar datos del estudiante para reflejar la membresía activa
+        if (user) {
+          const q = query(collection(db, 'students'), where('email', '==', user.email));
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            const estudianteData = { 
+              ...snapshot.docs[0].data(), 
+              uid: snapshot.docs[0].id
+            } as Estudiante;
+            setEstudiante(estudianteData);
+          }
+        }
+        
+        // Limpiar URL y redirigir al perfil
+        navigate('/perfil', { replace: true });
+      } else {
+        setMensaje(`❌ ${result.message || 'Error al confirmar el pago'}`);
+        navigate('/perfil', { replace: true });
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Error confirmando pago:', error);
+      setMensaje(`❌ Error al confirmar el pago: ${error.message}. Por favor contactanos.`);
+      navigate('/perfil', { replace: true });
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  // ✅ NUEVO useEffect: Detectar retorno de Mercado Pago
+  useEffect(() => {
+    // Si el usuario vuelve de Mercado Pago en /payment/success
+    if (location.pathname === '/payment/success') {
+      const paymentId = params.get('payment_id');
+      const collectionId = params.get('collection_id');
+      const status = params.get('status');
+      const externalReference = params.get('external_reference');
+
+      console.log('=== DETECTADO RETORNO DE MERCADO PAGO ===');
+      console.log('Payment ID:', paymentId);
+      console.log('Collection ID:', collectionId);
+      console.log('Status:', status);
+      console.log('External Reference:', externalReference);
+
+      if ((paymentId || collectionId) && status === 'approved') {
+        confirmarPago(
+          paymentId || collectionId || '', 
+          collectionId || undefined, 
+          externalReference || undefined
+        );
+      } else {
+        setMensaje('❌ Hubo un problema al procesar tu pago.');
+        navigate('/perfil', { replace: true });
+      }
+    }
+  }, [location.pathname, params]);
 
   // Funciones existentes (sin cambios)
   const verificarValidez = (fechaDesde?: Timestamp, fechaHasta?: Timestamp) => {
@@ -115,14 +204,13 @@ export default function ProfileInfo() {
     return Math.ceil(diferencia / (1000 * 3600 * 24));
   };
 
-  // ✅ MEJORADA: Función para obtener horas restantes (útil para pase diario)
   const getHorasRestantes = (fechaHasta?: Timestamp) => {
     if (!fechaHasta) return 0;
     
     const hoy = new Date();
     const hasta = fechaHasta.toDate();
     const diferencia = hasta.getTime() - hoy.getTime();
-    return Math.ceil(diferencia / (1000 * 3600)); // Horas
+    return Math.ceil(diferencia / (1000 * 3600));
   };
 
   const getEstadoReal = (membresia: any) => {
@@ -135,12 +223,10 @@ export default function ProfileInfo() {
         return diasRestantes < 0 ? 'vencido' : 'por_vencer';
       }
       
-      // Para pases diarios, verificar si está por vencer en las próximas horas
       if (isPaseDiario(membresia.nombre)) {
         const horasRestantes = getHorasRestantes(membresia.fechaHasta);
         if (horasRestantes <= 2 && horasRestantes > 0) return 'por_vencer';
       } else {
-        // Para planes mensuales, verificar los próximos 7 días
         const diasRestantes = getDiasRestantes(membresia.fechaHasta);
         if (diasRestantes <= 7 && diasRestantes > 0) return 'por_vencer';
       }
@@ -155,7 +241,6 @@ export default function ProfileInfo() {
     if (!estudiante?.membresia) return true;
     
     const estadoReal = getEstadoReal(estudiante.membresia);
-    // ✅ CORREGIDO: Permitir contratar si está vencido (usuario debe resetear manualmente)
     return estadoReal === 'sin_plan' || estadoReal === 'vencido' || estadoReal === 'cancelada';
   };
 
@@ -175,7 +260,6 @@ export default function ProfileInfo() {
           
           if (estudianteData.membresia) {
             const membresia = estudianteData.membresia;
-            // Asegurarse de que Timestamp se maneje correctamente, si viene como string
             if (membresia.fechaDesde && typeof membresia.fechaDesde === 'string') {
               membresia.fechaDesde = Timestamp.fromDate(new Date(membresia.fechaDesde));
             }
@@ -185,7 +269,6 @@ export default function ProfileInfo() {
           }
           
           setEstudiante(estudianteData);
-          
         }
 
         const planesSnap = await getDocs(collection(db, 'plans'));
@@ -289,8 +372,7 @@ export default function ProfileInfo() {
         }
       });
       
-      // ✅ MEJORADO: Mensaje específico según tipo de plan
-      const tiempoVigencia = isPaseDiario(plan.name) 
+      const tiempoVigencia = isPaseDiario(plan.name, plan.price) 
         ? 'hasta las 23:59 de hoy' 
         : 'por 1 mes completo';
       
@@ -321,27 +403,18 @@ export default function ProfileInfo() {
     setShowPaymentModal(true);
   };
 
-  // ✅ MEJORADA: Función de pago con Mercado Pago con fechas específicas
   const handlePayWithMercadoPago = async (plan: Plan) => {
     if (!estudiante) return;
 
     setPaymentLoading(true);
     try {
-      
-      
-      // ✅ NUEVO: Calcular fechas según el tipo de plan
-      const { fechaDesde, fechaHasta } = calcularFechasPlan(plan);
-      
       const paymentData = {
         fullName: estudiante.fullName,
         amount: plan.price,
         plan: plan.name,
         studentId: estudiante.uid,
         studentEmail: estudiante.email,
-        // ✅ NUEVO: Incluir información de fechas en el pago
-        fechaDesde: fechaDesde.toDate().toISOString(),
-        fechaHasta: fechaHasta.toDate().toISOString(),
-        tipoPlan: isPaseDiario(plan.name) ? 'diario' : 'mensual'
+        tipoPlan: isPaseDiario(plan.name, plan.price) ? 'diario' : 'mensual'
       };
 
       const requestData = {
@@ -368,10 +441,8 @@ export default function ProfileInfo() {
       }
 
       const data = await response.json();
-   
       
       if (data.init_point) {
-        
         window.location.href = data.init_point;
       } else {
         throw new Error('No se recibió URL de pago de Mercado Pago');
@@ -385,14 +456,11 @@ export default function ProfileInfo() {
     }
   };
 
-  // ✅ MEJORADA: Función de pago en efectivo con fechas específicas
   const handlePayWithCash = async (plan: Plan) => {
     if (!estudiante) return;
 
     setPaymentLoading(true);
     try {
-      
-      
       const updateData = {
         plan: plan.name,
         'membresia.nombre': plan.name,
@@ -418,8 +486,7 @@ export default function ProfileInfo() {
         }
       });
       
-      // ✅ MEJORADO: Mensaje específico según tipo de plan
-      const tiempoVigencia = isPaseDiario(plan.name) 
+      const tiempoVigencia = isPaseDiario(plan.name, plan.price) 
         ? 'hasta las 23:59 de hoy' 
         : 'por 30 días';
       
@@ -448,7 +515,9 @@ export default function ProfileInfo() {
             <div className="absolute inset-0 w-16 h-16 lg:w-20 lg:h-20 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
           <div className="text-center">
-            <h2 className="text-xl lg:text-2xl font-bold text-gray-800 mb-2">Cargando tu perfil...</h2>
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-800 mb-2">
+              {paymentLoading ? 'Procesando tu pago...' : 'Cargando tu perfil...'}
+            </h2>
           </div>
         </motion.div>
       </div>
@@ -514,7 +583,7 @@ export default function ProfileInfo() {
               </div>
             </div>
 
-            {/* Contenido Header Súper Compacto */}
+            {/* Resto del componente exactamente igual... */}
             <div className="p-3 lg:p-8">
               <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 mb-3 lg:mb-6">
                 <div className="flex flex-col space-y-1 lg:flex-row lg:items-center lg:space-y-0 lg:space-x-4">
@@ -536,7 +605,7 @@ export default function ProfileInfo() {
                 )}
               </div>
 
-              {/* Info Cards Compactas - Stack completo en móvil */}
+              {/* Info Cards Compactas */}
               <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-2 lg:gap-4 lg:space-y-0 mb-3 lg:mb-6">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2 lg:p-3 border border-blue-200">
                   <div className="flex items-center space-x-2">
@@ -559,7 +628,7 @@ export default function ProfileInfo() {
                 </div>
               </div>
 
-              {/* Mensaje Bienvenida Súper Compacto */}
+              {/* Mensaje Bienvenida */}
               <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg p-3 lg:p-6 border border-orange-200">
                 <div className="flex items-start space-x-2">
                   <Heart className="text-red-500 mt-0.5 flex-shrink-0 w-3 h-3 lg:w-4 lg:h-4" />
@@ -574,7 +643,7 @@ export default function ProfileInfo() {
             </div>
           </motion.div>
 
-          {/* Componente de Membresía */}
+          {/* Resto de componentes */}
           {estudiante && (
             <MembresiaProfile
               estudiante={estudiante}
@@ -583,7 +652,6 @@ export default function ProfileInfo() {
             />
           )}
 
-          {/* Componente de Planes */}
           <PlansProfile
             planes={planes}
             onComprarPlan={comprarPlan}
@@ -593,7 +661,7 @@ export default function ProfileInfo() {
             estudianteConPlan={!!estudiante?.plan}
           />
 
-          {/* Botón Cerrar Sesión Súper Compacto */}
+          {/* Botón Cerrar Sesión */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -613,7 +681,7 @@ export default function ProfileInfo() {
         </div>
       </div>
 
-      {/* Modal de pago - ✅ CORREGIDO con las funciones necesarias */}
+      {/* Modal de pago */}
       <PaymentProfile
         plan={selectedPlan}
         isOpen={showPaymentModal}

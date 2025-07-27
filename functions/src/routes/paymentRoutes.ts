@@ -14,6 +14,6 @@ router.get('/webhook/test', PaymentController.testWebhook);
 router.post('/create-pending', PaymentController.createPendingPayment);
 router.post('/payments/create-preference', PaymentController.createPaymentPreference); // 🆕 NUEVA RUTA
 router.get('/payments/test-config', PaymentController.testConfiguration);
-
+router.post('/payments/confirm', PaymentController.confirmPayment);
 
 export default router;
