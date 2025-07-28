@@ -46,7 +46,8 @@ const convertirADate = (fecha: string | Timestamp | undefined): Date | null => {
 // Función actualizada para verificar horario usando datos dinámicos del plan
 function estaDentroDelHorario(plan: any): boolean {
   if (!plan || !plan.startHour || !plan.endHour) {
-    console.log('❌ Plan sin horarios definidos', plan);
+    /* console.log('❌ Plan sin horarios definidos', plan); */
+
     return false;
   }
 
@@ -59,15 +60,22 @@ function estaDentroDelHorario(plan: any): boolean {
   const horaInicio = parseInt(startHour);
   const horaFin = parseInt(endHour);
 
-  console.log('=== VERIFICACIÓN DE HORARIOS (SERVICE) ===');
-  console.log('Hora actual:', ahora.toLocaleTimeString());
-  console.log('Hora actual (numérica):', horaActual);
-  console.log('Horario del plan:', `${plan.startHour} - ${plan.endHour}`);
-  console.log('Hora inicio (numérica):', horaInicio);
-  console.log('Hora fin (numérica):', horaFin);
+  /* console.log('=== VERIFICACIÓN DE HORARIOS (SERVICE) ==='); */
+
+  /* console.log('Hora actual:', ahora.toLocaleTimeString()); */
+
+  /* console.log('Hora actual (numérica):', horaActual); */
+
+  /* console.log('Horario del plan:', `${plan.startHour} - ${plan.endHour}`); */
+
+  /* console.log('Hora inicio (numérica):', horaInicio); */
+
+  /* console.log('Hora fin (numérica):', horaFin); */
+
 
   const dentroDelHorario = horaActual >= horaInicio && horaActual <= horaFin;
-  console.log('Dentro del horario:', dentroDelHorario);
+  /* console.log('Dentro del horario:', dentroDelHorario); */
+
 
   return dentroDelHorario;
 }
@@ -75,7 +83,8 @@ function estaDentroDelHorario(plan: any): boolean {
 // Función actualizada para verificar membresía usando fechaDesde y fechaHasta
 function esMembresiaActiva(membresia: any): boolean {
   if (!membresia || !membresia.fechaDesde || !membresia.fechaHasta) {
-    console.log('❌ Membresía sin fechas válidas', membresia);
+    /* console.log('❌ Membresía sin fechas válidas', membresia); */
+
     return false;
   }
 
@@ -83,85 +92,106 @@ function esMembresiaActiva(membresia: any): boolean {
   const desde = convertirADate(membresia.fechaDesde);
   const hasta = convertirADate(membresia.fechaHasta);
 
-  console.log('=== VERIFICACIÓN DE MEMBRESÍA (SERVICE) ===');
-  console.log('Hoy:', hoy.toISOString());
-  console.log('Desde:', desde?.toISOString() || 'null');
-  console.log('Hasta:', hasta?.toISOString() || 'null');
+  /* console.log('=== VERIFICACIÓN DE MEMBRESÍA (SERVICE) ==='); */
+
+  /* console.log('Hoy:', hoy.toISOString()); */
+
+  /* console.log('Desde:', desde?.toISOString() || 'null'); */
+
+  /* console.log('Hasta:', hasta?.toISOString() || 'null'); */
+
 
   if (!desde || !hasta) {
-    console.log('❌ Fechas inválidas');
+    /* console.log('❌ Fechas inválidas'); */
+
     return false;
   }
 
   // Verificar si está en el período de vigencia
   if (hoy < desde) {
-    console.log('❌ Membresía aún no activada');
+    /* console.log('❌ Membresía aún no activada'); */
+
     return false;
   }
 
   if (hoy > hasta) {
-    console.log('❌ Membresía vencida');
+    /* console.log('❌ Membresía vencida'); */
+
     return false;
   }
 
-  console.log('✅ Membresía activa');
+  /* console.log('✅ Membresía activa'); */
+
   return true;
 }
 
 // Función para obtener los datos completos del plan
 const obtenerDatosPlan = async (planRef: any) => {
   try {
-    console.log('=== OBTENIENDO DATOS DEL PLAN ===');
-    console.log('planRef recibido:', planRef);
-    console.log('Tipo de planRef:', typeof planRef);
+    /* console.log('=== OBTENIENDO DATOS DEL PLAN ==='); */
+
+    /* console.log('planRef recibido:', planRef); */
+
+    /* console.log('Tipo de planRef:', typeof planRef); */
+
 
     // Si el plan ya es un objeto con horarios, devolverlo
     if (planRef && typeof planRef === 'object' && planRef.startHour && planRef.endHour) {
-      console.log('✅ Plan ya tiene horarios completos');
+      /* console.log('✅ Plan ya tiene horarios completos'); */
+
       return planRef;
     }
 
     // Si es una referencia/ID string, buscar en la colección de planes
     if (typeof planRef === 'string') {
-      console.log('🔍 Buscando plan por nombre:', planRef);
+      /* console.log('🔍 Buscando plan por nombre:', planRef); */
+
       const planesRef = collection(db, 'plans');
       const planQuery = query(planesRef, where('name', '==', planRef));
       const planSnapshot = await getDocs(planQuery);
       
       if (!planSnapshot.empty) {
         const planData = planSnapshot.docs[0].data();
-        console.log('✅ Plan encontrado por nombre:', planData);
+        /* console.log('✅ Plan encontrado por nombre:', planData); */
+
         return planData;
       } else {
-        console.log('❌ No se encontró plan con nombre:', planRef);
+        /* console.log('❌ No se encontró plan con nombre:', planRef); */
+
       }
     }
 
     // Si el plan tiene un campo name, buscar por ese nombre
     if (planRef && planRef.name) {
-      console.log('🔍 Buscando plan por campo name:', planRef.name);
+      /* console.log('🔍 Buscando plan por campo name:', planRef.name); */
+
       const planesRef = collection(db, 'plans');
       const planQuery = query(planesRef, where('name', '==', planRef.name));
       const planSnapshot = await getDocs(planQuery);
       
       if (!planSnapshot.empty) {
         const planData = planSnapshot.docs[0].data();
-        console.log('✅ Plan encontrado por campo name:', planData);
+        /* console.log('✅ Plan encontrado por campo name:', planData); */
+
         return planData;
       }
     }
 
     // Intento adicional: listar todos los planes para debug
-    console.log('🔍 Listando todos los planes disponibles para debug...');
+    /* console.log('🔍 Listando todos los planes disponibles para debug...'); */
+
     const allPlansQuery = collection(db, 'plans');
     const allPlansSnapshot = await getDocs(allPlansQuery);
     
-    console.log('Planes disponibles:');
+    /* console.log('Planes disponibles:'); */
+
     allPlansSnapshot.docs.forEach((doc, index) => {
-      console.log(`Plan ${index + 1}:`, doc.data());
+      /* console.log(`Plan ${index + 1}:`, doc.data()); */
+
     });
 
-    console.log('❌ No se encontró el plan o no tiene horarios');
+    /* console.log('❌ No se encontró el plan o no tiene horarios'); */
+
     return null;
   } catch (error) {
     console.error('❌ Error obteniendo datos del plan:', error);
@@ -180,14 +210,19 @@ export const checkStudentStatus = async (code: string): Promise<Student> => {
   }
 
   const studentData = snapshot.docs[0].data() as Student;
-  console.log('=== DATOS DEL ESTUDIANTE (SERVICE) ===');
-  console.log('Student data original:', studentData);
-  console.log('Membresía:', studentData.membresia);
-  console.log('Plan (original):', studentData.plan);
+  /* console.log('=== DATOS DEL ESTUDIANTE (SERVICE) ==='); */
+
+  /* console.log('Student data original:', studentData); */
+
+  /* console.log('Membresía:', studentData.membresia); */
+
+  /* console.log('Plan (original):', studentData.plan); */
+
 
   // IMPORTANTE: Obtener los datos completos del plan
   const planCompleto = await obtenerDatosPlan(studentData.plan);
-  console.log('Plan completo obtenido:', planCompleto);
+  /* console.log('Plan completo obtenido:', planCompleto); */
+
 
   // Solo verificar membresía aquí, NO horarios
   if (!esMembresiaActiva(studentData.membresia)) {
@@ -200,11 +235,16 @@ export const checkStudentStatus = async (code: string): Promise<Student> => {
     plan: planCompleto || studentData.plan // Usar plan completo o fallback al original
   };
 
-  console.log('=== ESTUDIANTE COMPLETO FINAL ===');
-  console.log('Student completo:', studentCompleto);
-  console.log('Tiene fullName:', !!studentCompleto.fullName);
-  console.log('Tiene email:', !!studentCompleto.email);
-  console.log('Tiene membresia:', !!studentCompleto.membresia);
+  /* console.log('=== ESTUDIANTE COMPLETO FINAL ==='); */
+
+  /* console.log('Student completo:', studentCompleto); */
+
+  /* console.log('Tiene fullName:', !!studentCompleto.fullName); */
+
+  /* console.log('Tiene email:', !!studentCompleto.email); */
+
+  /* console.log('Tiene membresia:', !!studentCompleto.membresia); */
+
 
   return studentCompleto;
 };
@@ -248,15 +288,21 @@ export const checkInOrOut = async (code: string): Promise<{ mensaje: string; est
   const student = studentDoc.data() as Student;
   const studentId = studentDoc.id;
 
-  console.log('=== CHECK IN/OUT (SERVICE) ===');
-  console.log('Student:', student);
-  console.log('Membresía:', student.membresia);
-  console.log('Plan (original):', student.plan);
-  console.log('isCheckedIn:', student.isCheckedIn);
+  /* console.log('=== CHECK IN/OUT (SERVICE) ==='); */
+
+  /* console.log('Student:', student); */
+
+  /* console.log('Membresía:', student.membresia); */
+
+  /* console.log('Plan (original):', student.plan); */
+
+  /* console.log('isCheckedIn:', student.isCheckedIn); */
+
 
   // Obtener los datos completos del plan
   const planCompleto = await obtenerDatosPlan(student.plan);
-  console.log('Plan completo para check-in/out:', planCompleto);
+  /* console.log('Plan completo para check-in/out:', planCompleto); */
+
 
   // Verificar membresía
   if (!esMembresiaActiva(student.membresia)) {

@@ -33,7 +33,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsAdminFlag(adminStatus);
       return adminStatus;
     } catch (error) {
-      console.log('Usuario no es admin');
+      /* console.log('Usuario no es admin'); */
+
       setIsAdminFlag(false);
       return false;
     }

@@ -135,7 +135,8 @@ const EditProfile: React.FC<EditProfileProps> = ({ estudiante, onUpdate, onMessa
            
             await deleteObject(oldPhotoRef);
           } catch (error) {
-            console.log('DEBUG: No se pudo eliminar la foto antigua de Storage, continuando...', error); // Agregado para depuración
+            /* console.log('DEBUG: No se pudo eliminar la foto antigua de Storage, continuando...', error); */
+ // Agregado para depuración
           }
       }
 

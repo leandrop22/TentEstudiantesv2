@@ -82,11 +82,13 @@ const SessionsTable: React.FC = () => {
         });
         
         if (now < data.cacheExpiry) {
-          console.log('✅ Usando sesiones desde cache');
+          /* console.log('✅ Usando sesiones desde cache'); */
+
           setCacheUsed(true);
           return data;
         } else {
-          console.log('⏰ Cache de sesiones expirado');
+          /* console.log('⏰ Cache de sesiones expirado'); */
+
           localStorage.removeItem(CACHE_KEY);
         }
       }
@@ -107,7 +109,8 @@ const SessionsTable: React.FC = () => {
         cacheExpiry: now + CACHE_DURATION
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
-      console.log('💾 Sesiones guardadas en cache hasta:', new Date(dataToCache.cacheExpiry).toLocaleString());
+      /* console.log('💾 Sesiones guardadas en cache hasta:', new Date(dataToCache.cacheExpiry).toLocaleString()); */
+
       setLastUpdate(now);
     } catch (error) {
       console.error('❌ Error guardando cache de sesiones:', error);
@@ -118,13 +121,15 @@ const SessionsTable: React.FC = () => {
   const autoCloseSessions = async () => {
     try {
       setAutoClosing(true);
-      console.log('🔄 Iniciando cierre automático de sesiones...');
+      /* console.log('🔄 Iniciando cierre automático de sesiones...'); */
+
       
       // Obtener sesiones activas (sin checkout)
       const activeSessions = sessions.filter(session => !session.checkOutTimestamp);
       
       if (activeSessions.length === 0) {
-        console.log('ℹ️ No hay sesiones activas para cerrar');
+        /* console.log('ℹ️ No hay sesiones activas para cerrar'); */
+
         return;
       }
 
@@ -132,7 +137,8 @@ const SessionsTable: React.FC = () => {
       const closeTime = new Date();
       closeTime.setHours(21, 30, 0, 0); // 21:30:00
       
-      console.log(`🕘 Cerrando ${activeSessions.length} sesiones a las 21:30`);
+      /* console.log(`🕘 Cerrando ${activeSessions.length} sesiones a las 21:30`); */
+
       
       const updatePromises = activeSessions.map(async (session) => {
         const checkInTime = session.checkInTimestamp.toDate();
@@ -146,7 +152,8 @@ const SessionsTable: React.FC = () => {
           durationMinutes: durationMinutes > 0 ? durationMinutes : 0
         });
         
-        console.log(`✅ Sesión cerrada: ${session.fullName} - Duración: ${durationMinutes} min`);
+        /* console.log(`✅ Sesión cerrada: ${session.fullName} - Duración: ${durationMinutes} min`); */
+
         
         return {
           ...session,
@@ -188,7 +195,8 @@ const SessionsTable: React.FC = () => {
     if (currentTime === 2130) {
       const activeSessions = sessions.filter(s => !s.checkOutTimestamp);
       if (activeSessions.length > 0) {
-        console.log('🕘 Es hora de cerrar sesiones automáticamente');
+        /* console.log('🕘 Es hora de cerrar sesiones automáticamente'); */
+
         autoCloseSessions();
       }
     }
@@ -200,7 +208,8 @@ const SessionsTable: React.FC = () => {
       setLoading(true);
       setCacheUsed(false);
       
-      console.log('🔄 Iniciando fetch de sesiones...');
+      /* console.log('🔄 Iniciando fetch de sesiones...'); */
+
       
       const now = new Date();
       let sessionsQuery;
@@ -307,7 +316,8 @@ const SessionsTable: React.FC = () => {
   }, [filters.dateFilter]);
 
   const handleForceRefresh = () => {
-    console.log('🔄 Forzando actualización de sesiones...');
+    /* console.log('🔄 Forzando actualización de sesiones...'); */
+
     localStorage.removeItem(CACHE_KEY);
     fetchSessions(true);
   };

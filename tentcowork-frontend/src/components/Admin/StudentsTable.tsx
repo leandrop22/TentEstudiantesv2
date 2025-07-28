@@ -169,12 +169,14 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
                            (data.dataType === 'all' && requestedScope === 'active');
         
         if (now < data.cacheExpiry && scopeMatches) {
-          console.log('✅ Usando estudiantes desde cache');
+          /* console.log('✅ Usando estudiantes desde cache'); */
+
           setCacheUsed(true);
           setDataScope(data.dataType);
           return data;
         } else {
-          console.log('⏰ Cache de estudiantes inválido o scope diferente');
+          /* console.log('⏰ Cache de estudiantes inválido o scope diferente'); */
+
           localStorage.removeItem(CACHE_KEY);
         }
       }
@@ -299,7 +301,8 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
             filteredStudents = cachedData.students.filter(s => 
               getMembershipStatus(s) === 'activa'
             );
-            console.log('✂️ Filtrando estudiantes activos del cache completo');
+            /* console.log('✂️ Filtrando estudiantes activos del cache completo'); */
+
           }
           
           setStudents(filteredStudents);
@@ -371,7 +374,8 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
   }, [filters.planStatus]);
 
   const handleForceRefresh = () => {
-    console.log('🔄 Forzando actualización de estudiantes...');
+    /* console.log('🔄 Forzando actualización de estudiantes...'); */
+
     localStorage.removeItem(CACHE_KEY);
     const requiredScope = getRequiredScope();
     fetchStudents(true, requiredScope);
@@ -380,8 +384,10 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
   const handleResetMembership = async (studentId: string) => {
     setIsProcessingAdmin(true);
     try {
-      console.log('=== RESETEANDO MEMBRESÍA ===');
-      console.log('Student ID:', studentId);
+      /* console.log('=== RESETEANDO MEMBRESÍA ==='); */
+
+      /* console.log('Student ID:', studentId); */
+
       
       const studentRef = doc(db, 'students', studentId);
       
@@ -399,7 +405,8 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
       };
       
       await updateDoc(studentRef, updateData);
-      console.log('✅ Membresía reseteada exitosamente');
+      /* console.log('✅ Membresía reseteada exitosamente'); */
+
       
       setStudents(prev => prev.map(student => 
         student.id === studentId 
@@ -432,9 +439,12 @@ const StudentsTable: React.FC<StudentsTableProps> = ({ availablePlans = [] }) =>
   const handleToggleStudentStatus = async (studentId: string, newStatus: boolean) => {
     setIsProcessingAdmin(true);
     try {
-      console.log('=== CAMBIANDO ESTADO DEL ESTUDIANTE ===');
-      console.log('Student ID:', studentId);
-      console.log('Nuevo estado:', newStatus);
+      /* console.log('=== CAMBIANDO ESTADO DEL ESTUDIANTE ==='); */
+
+      /* console.log('Student ID:', studentId); */
+
+      /* console.log('Nuevo estado:', newStatus); */
+
       
       const studentRef = doc(db, 'students', studentId);
       await updateDoc(studentRef, { activo: newStatus });

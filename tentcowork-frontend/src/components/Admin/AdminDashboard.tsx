@@ -109,11 +109,13 @@ const AdminDashboard: React.FC = () => {
         });
         
         if (now < data.cacheExpiry) {
-          console.log('✅ Usando datos desde cache');
+          /* console.log('✅ Usando datos desde cache'); */
+
           setCacheUsed(true);
           return data;
         } else {
-          console.log('⏰ Cache expirado, eliminando...');
+          /* console.log('⏰ Cache expirado, eliminando...'); */
+
           localStorage.removeItem(CACHE_KEY);
         }
       }
@@ -134,7 +136,8 @@ const AdminDashboard: React.FC = () => {
         cacheExpiry: now + CACHE_DURATION
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
-      console.log('💾 Datos guardados en cache hasta:', new Date(dataToCache.cacheExpiry).toLocaleString());
+      /* console.log('💾 Datos guardados en cache hasta:', new Date(dataToCache.cacheExpiry).toLocaleString()); */
+
     } catch (error) {
       console.error('❌ Error guardando cache:', error);
     }
@@ -158,7 +161,8 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       setCacheUsed(false);
       
-      console.log('🔄 Iniciando fetch de métricas...');
+      /* console.log('🔄 Iniciando fetch de métricas...'); */
+
       
       // ✅ OPTIMIZACIÓN 1: Solo estudiantes activos + conteo total
       const [
@@ -410,7 +414,8 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleForceRefresh = () => {
-    console.log('🔄 Forzando actualización...');
+    /* console.log('🔄 Forzando actualización...'); */
+
     localStorage.removeItem(CACHE_KEY);
     fetchMetrics(true);
   };

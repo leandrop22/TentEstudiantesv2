@@ -317,7 +317,8 @@ const PaymentsTable: React.FC = () => {
       setPlans(plansData);
       
       if (plansData.length === 0) {
-        console.log('⚠️ NO SE ENCONTRARON PLANES en la colección "plans"');
+        /* console.log('⚠️ NO SE ENCONTRARON PLANES en la colección "plans"'); */
+
       }
     } catch (error: any) {
       console.error("Error fetching plans: ", error);

@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "vite-plugin-remove-console": "^2.2.0"
+  }
+}

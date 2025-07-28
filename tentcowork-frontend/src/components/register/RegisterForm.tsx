@@ -235,17 +235,22 @@ export default function RegisterForm() {
     setError('');
 
     try {
-      console.log('Iniciando registro...');
-      console.log('Form data:', form);
+      /* console.log('Iniciando registro...'); */
+
+      /* console.log('Form data:', form); */
+
       
       // Primero crear el usuario en Firebase Auth
-      console.log('Creando usuario en Firebase Auth...');
+      /* console.log('Creando usuario en Firebase Auth...'); */
+
       const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
       const uid = userCredential.user.uid;
-      console.log('Usuario creado con UID:', uid);
+      /* console.log('Usuario creado con UID:', uid); */
+
       
       const newCode = generateAccessCode();
-      console.log('Código generado:', newCode);
+      /* console.log('Código generado:', newCode); */
+
 
       const studentData = {
         uid,
@@ -263,15 +268,19 @@ export default function RegisterForm() {
         lastCheckInTimestamp: null
       };
 
-      console.log('Datos a guardar en Firestore:', studentData);
+      /* console.log('Datos a guardar en Firestore:', studentData); */
+
       
       // Crear el documento en Firestore
-      console.log('Guardando en Firestore...');
+      /* console.log('Guardando en Firestore...'); */
+
       const docRef = await addDoc(collection(db, 'students'), studentData);
-      console.log('Documento creado con ID:', docRef.id);
+      /* console.log('Documento creado con ID:', docRef.id); */
+
 
       setAccessCode(newCode);
-      console.log('Registro completado exitosamente');
+      /* console.log('Registro completado exitosamente'); */
+
     } catch (err: any) {
       console.error('Error completo:', err);
       console.error('Error code:', err.code);

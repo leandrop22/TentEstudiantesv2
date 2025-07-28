@@ -98,10 +98,14 @@ export default function ProfileInfo() {
   const confirmarPago = async (paymentId: string, collectionId?: string, externalReference?: string) => {
     setPaymentLoading(true);
     try {
-      console.log('=== CONFIRMANDO PAGO DESDE FRONTEND ===');
-      console.log('Payment ID:', paymentId);
-      console.log('Collection ID:', collectionId);
-      console.log('External Reference:', externalReference);
+      /* console.log('=== CONFIRMANDO PAGO DESDE FRONTEND ==='); */
+
+      /* console.log('Payment ID:', paymentId); */
+
+      /* console.log('Collection ID:', collectionId); */
+
+      /* console.log('External Reference:', externalReference); */
+
 
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/payments/confirm`, {
         method: 'POST',
@@ -122,7 +126,8 @@ export default function ProfileInfo() {
       }
 
       const result = await response.json();
-      console.log('✅ Respuesta del backend:', result);
+      /* console.log('✅ Respuesta del backend:', result); */
+
 
       if (result.success) {
         setMensaje('✅ ¡Pago confirmado! Tu membresía ha sido activada exitosamente.');
@@ -165,11 +170,16 @@ export default function ProfileInfo() {
       const status = params.get('status');
       const externalReference = params.get('external_reference');
 
-      console.log('=== DETECTADO RETORNO DE MERCADO PAGO ===');
-      console.log('Payment ID:', paymentId);
-      console.log('Collection ID:', collectionId);
-      console.log('Status:', status);
-      console.log('External Reference:', externalReference);
+      /* console.log('=== DETECTADO RETORNO DE MERCADO PAGO ==='); */
+
+      /* console.log('Payment ID:', paymentId); */
+
+      /* console.log('Collection ID:', collectionId); */
+
+      /* console.log('Status:', status); */
+
+      /* console.log('External Reference:', externalReference); */
+
 
       if ((paymentId || collectionId) && status === 'approved') {
         confirmarPago(

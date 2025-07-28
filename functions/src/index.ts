@@ -51,14 +51,16 @@ export const actualizarMembresiasVencidas = onSchedule(
   },
   async () => {
     const ahora = new Date();
-    console.log('⏱ Ejecutando función a:', ahora.toISOString());
+    /* console.log('⏱ Ejecutando función a:', ahora.toISOString()); */
+
 
     const snapshot = await db.collection('students')
       .where('membresia.estado', '==', 'activa')
       .get();
 
     if (snapshot.empty) {
-      console.log('⚠️ No hay estudiantes con membresía activa');
+      /* console.log('⚠️ No hay estudiantes con membresía activa'); */
+
       return;
     }
 
@@ -68,17 +70,21 @@ export const actualizarMembresiasVencidas = onSchedule(
       const data = doc.data();
       const fechaHasta = data.membresia?.fechaHasta?.toDate();
 
-      console.log(`🔍 Revisando ${data.fullName}:`, fechaHasta);
+      /* console.log(`🔍 Revisando ${data.fullName}:`, fechaHasta); */
+
 
       if (fechaHasta && fechaHasta < ahora) {
-        console.log(`❌ Vencido: ${data.fullName}`);
+        /* console.log(`❌ Vencido: ${data.fullName}`); */
+
         batch.update(doc.ref, { 'membresia.estado': 'vencido' });
       } else {
-        console.log(`✅ Aún vigente: ${data.fullName}`);
+        /* console.log(`✅ Aún vigente: ${data.fullName}`); */
+
       }
     });
 
     await batch.commit();
-    console.log('✅ Membresías vencidas actualizadas');
+    /* console.log('✅ Membresías vencidas actualizadas'); */
+
   }
 );

@@ -13,18 +13,22 @@ let payment: Payment | null = null;
 
 // 🔧 INICIALIZACIÓN CORREGIDA
 export function initializeMercadoPago() {
-  console.log('🔧 Inicializando Mercado Pago...');
+  /* console.log('🔧 Inicializando Mercado Pago...'); */
+
   
   const token = process.env.MP_ACCESS_TOKEN;
-  console.log('Token presente:', !!token);
+  /* console.log('Token presente:', !!token); */
+
   
   if (!token) {
-    console.log('❌ MP_ACCESS_TOKEN no encontrado');
+    /* console.log('❌ MP_ACCESS_TOKEN no encontrado'); */
+
     return false;
   }
 
   if (!token.startsWith('APP_USR-')) {
-    console.log('❌ Token formato incorrecto');
+    /* console.log('❌ Token formato incorrecto'); */
+
     return false;
   }
 
@@ -37,10 +41,14 @@ export function initializeMercadoPago() {
     preference = new Preference(client);
     payment = new Payment(client);
     
-    console.log('✅ Mercado Pago inicializado correctamente');
-    console.log('  - Cliente:', !!client);
-    console.log('  - Preference:', !!preference);
-    console.log('  - Payment:', !!payment);
+    /* console.log('✅ Mercado Pago inicializado correctamente'); */
+
+    /* console.log('  - Cliente:', !!client); */
+
+    /* console.log('  - Preference:', !!preference); */
+
+    /* console.log('  - Payment:', !!payment); */
+
     
     return true;
     
@@ -83,8 +91,10 @@ class PaymentController {
    */
   static async confirmPayment(req: Request, res: Response): Promise<void> {
     try {
-      console.log('=== CONFIRMANDO PAGO DESDE FRONTEND ===');
-      console.log('Body recibido:', req.body);
+      /* console.log('=== CONFIRMANDO PAGO DESDE FRONTEND ==='); */
+
+      /* console.log('Body recibido:', req.body); */
+
       
       const { paymentId, collectionId, status, externalReference } = req.body;
       
@@ -98,7 +108,8 @@ class PaymentController {
 
       // Verificar que MP esté inicializado
       if (!ensureMPInitialized() || !payment) {
-        console.log('❌ Mercado Pago no está inicializado');
+        /* console.log('❌ Mercado Pago no está inicializado'); */
+
         res.status(500).json({ 
           success: false,
           message: 'Error de configuración del servidor'
@@ -118,17 +129,20 @@ class PaymentController {
         return;
       }
 
-      console.log('Obteniendo pago de MP con ID:', numericPaymentId);
+      /* console.log('Obteniendo pago de MP con ID:', numericPaymentId); */
+
       const mpPaymentResponse = await payment.get({ id: numericPaymentId });
       
-      console.log('Respuesta de MP:', JSON.stringify(mpPaymentResponse, null, 2));
+      /* console.log('Respuesta de MP:', JSON.stringify(mpPaymentResponse, null, 2)); */
+
 
       if (mpPaymentResponse.status === 'approved') {
         // Buscar si ya existe el pago en nuestra BD
         const existingPayment = await PaymentController.findPaymentByMercadoPagoId(mpPaymentId);
         
         if (existingPayment) {
-          console.log('✅ Pago ya existe y está procesado');
+          /* console.log('✅ Pago ya existe y está procesado'); */
+
           res.json({ 
             success: true, 
             message: 'Pago ya confirmado anteriormente',
@@ -165,8 +179,10 @@ class PaymentController {
         const planName = planFromReference || studentData?.plan || 'Plan no especificado';
         const planPrice = mpPaymentResponse.transaction_amount || 0;
         
-        console.log('Plan extraído:', planName);
-        console.log('Precio del plan:', planPrice);
+        /* console.log('Plan extraído:', planName); */
+
+        /* console.log('Precio del plan:', planPrice); */
+
         
         // ✅ CALCULAR FECHAS SEGÚN TIPO DE PLAN (igual que PaymentsTable)
         const isPaseDiario = (planName: string, price: number = 0) => {
@@ -218,7 +234,8 @@ class PaymentController {
         };
 
         const paymentDocRef = await db.collection('payments').add(paymentRecord);
-        console.log('✅ Pago creado en BD:', paymentDocRef.id);
+        /* console.log('✅ Pago creado en BD:', paymentDocRef.id); */
+
 
         // Actualizar membresía del estudiante con fechas específicas según el plan
         const studentRef = db.collection('students').doc(studentId);
@@ -233,14 +250,20 @@ class PaymentController {
           activo: true
         };
         
-        console.log('Actualizando estudiante con fechas específicas:');
-        console.log('  - Plan:', planName);
-        console.log('  - Es pase diario:', isPaseDiario(planName, planPrice));
-        console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
-        console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
+        /* console.log('Actualizando estudiante con fechas específicas:'); */
+
+        /* console.log('  - Plan:', planName); */
+
+        /* console.log('  - Es pase diario:', isPaseDiario(planName, planPrice)); */
+
+        /* console.log('  - Fecha desde:', fechaDesde.toDate().toISOString()); */
+
+        /* console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString()); */
+
         
         await studentRef.update(studentUpdateData);
-        console.log('✅ Membresía del estudiante activada con fechas correctas');
+        /* console.log('✅ Membresía del estudiante activada con fechas correctas'); */
+
 
         res.json({ 
           success: true, 
@@ -252,7 +275,8 @@ class PaymentController {
         });
 
       } else {
-        console.log('❌ El pago no está aprobado. Estado:', mpPaymentResponse.status);
+        /* console.log('❌ El pago no está aprobado. Estado:', mpPaymentResponse.status); */
+
         res.json({ 
           success: false, 
           message: `Pago no aprobado. Estado: ${mpPaymentResponse.status}` 
@@ -275,15 +299,19 @@ class PaymentController {
    */
   static async handleMercadoPagoWebhook(req: Request, res: Response): Promise<void> {
     try {
-      console.log('=== WEBHOOK MERCADO PAGO RECIBIDO ===');
-      console.log('Headers:', req.headers);
-      console.log('Body:', JSON.stringify(req.body, null, 2));
+      /* console.log('=== WEBHOOK MERCADO PAGO RECIBIDO ==='); */
+
+      /* console.log('Headers:', req.headers); */
+
+      /* console.log('Body:', JSON.stringify(req.body, null, 2)); */
+
       
       const webhookData: MercadoPagoWebhookData = req.body;
       
       // Validar datos del webhook
       if (!webhookData.type || !webhookData.data?.id) {
-        console.log('❌ Webhook data inválida');
+        /* console.log('❌ Webhook data inválida'); */
+
         res.status(400).json({ 
           error: 'Invalid webhook data', 
           received: webhookData 
@@ -293,35 +321,41 @@ class PaymentController {
       
       // Solo procesar notificaciones de pagos
       if (webhookData.type !== 'payment') {
-        console.log('Webhook ignorado - no es un pago');
+        /* console.log('Webhook ignorado - no es un pago'); */
+
         res.status(200).json({ message: 'Webhook ignored - not a payment' });
         return;
       }
 
       // 🔧 EL ID VIENE COMO STRING PERO MP LO MANEJA COMO NUMBER
       const paymentId = webhookData.data.id;
-      console.log('ID del pago en Mercado Pago:', paymentId);
+      /* console.log('ID del pago en Mercado Pago:', paymentId); */
+
 
       // Obtener información del pago desde MP
       const paymentInfo = await PaymentController.getPaymentFromMercadoPago(paymentId);
-      console.log('Info del pago desde MP:', JSON.stringify(paymentInfo, null, 2));
+      /* console.log('Info del pago desde MP:', JSON.stringify(paymentInfo, null, 2)); */
+
 
       // Buscar el pago en nuestra base de datos usando el ID como string
       const payment = await PaymentController.findPaymentByMercadoPagoId(paymentId);
       
       if (!payment) {
-        console.log('❌ Pago no encontrado en nuestra base de datos');
+        /* console.log('❌ Pago no encontrado en nuestra base de datos'); */
+
         res.status(404).json({ error: 'Payment not found in database' });
         return;
       }
 
-      console.log('✅ Pago encontrado en BD:', payment);
+      /* console.log('✅ Pago encontrado en BD:', payment); */
+
 
       // Procesar según el estado del pago
       await PaymentController.processPaymentStatus(payment, paymentInfo);
       
       // ✅ Responder exitosamente
-      console.log('✅ Webhook procesado exitosamente');
+      /* console.log('✅ Webhook procesado exitosamente'); */
+
       res.status(200).json({ 
         message: 'Webhook processed successfully',
         timestamp: new Date().toISOString(),
@@ -344,11 +378,13 @@ class PaymentController {
    */
   static async createPaymentPreference(req: Request<{}, MercadoPagoPreferenceResponse, CreatePreferenceRequest>, res: Response): Promise<void> {
     try {
-      console.log('=== CREANDO PREFERENCIA MERCADO PAGO ===');
+      /* console.log('=== CREANDO PREFERENCIA MERCADO PAGO ==='); */
+
       
       // 🔧 VERIFICAR QUE MP ESTÉ INICIALIZADO
       if (!ensureMPInitialized() || !client || !preference) {
-        console.log('❌ Mercado Pago no está inicializado');
+        /* console.log('❌ Mercado Pago no está inicializado'); */
+
         res.status(500).json({ 
           error: 'Mercado Pago client not initialized',
           details: 'Check MP_ACCESS_TOKEN configuration'
@@ -409,7 +445,8 @@ class PaymentController {
         statement_descriptor: 'TENTCOWORK',
       };
 
-      console.log('Preference data:', JSON.stringify(preferenceData, null, 2));
+      /* console.log('Preference data:', JSON.stringify(preferenceData, null, 2)); */
+
 
       // 🔧 CREAR LA PREFERENCIA CON NUEVA API
       const response = await preference.create({ body: preferenceData });
@@ -447,7 +484,8 @@ class PaymentController {
    */
   static async createPendingPayment(req: Request, res: Response): Promise<void> {
     try {
-      console.log('=== CREANDO PAGO PENDIENTE PARA RECEPCIÓN ===');
+      /* console.log('=== CREANDO PAGO PENDIENTE PARA RECEPCIÓN ==='); */
+
       
       const { paymentData } = req.body;
       
@@ -489,7 +527,8 @@ class PaymentController {
       // Guardar en la colección 'payments'
       const docRef = await db.collection('payments').add(paymentRecord);
       
-      console.log('✅ Pago pendiente creado exitosamente:', docRef.id);
+      /* console.log('✅ Pago pendiente creado exitosamente:', docRef.id); */
+
       
       res.json({
         success: true,
@@ -514,12 +553,18 @@ class PaymentController {
       const hasAccessToken = !!process.env.MP_ACCESS_TOKEN;
       const hasPublicKey = !!process.env.MP_PUBLIC_KEY;
       
-      console.log('=== VERIFICANDO CONFIGURACIÓN MP ===');
-      console.log('Has Access Token:', hasAccessToken);
-      console.log('Has Public Key:', hasPublicKey);
-      console.log('MP Initialized:', mpInitialized);
-      console.log('Client exists:', !!client);
-      console.log('Preference exists:', !!preference);
+      /* console.log('=== VERIFICANDO CONFIGURACIÓN MP ==='); */
+
+      /* console.log('Has Access Token:', hasAccessToken); */
+
+      /* console.log('Has Public Key:', hasPublicKey); */
+
+      /* console.log('MP Initialized:', mpInitialized); */
+
+      /* console.log('Client exists:', !!client); */
+
+      /* console.log('Preference exists:', !!preference); */
+
       
       if (!hasAccessToken) {
         res.status(500).json({ 
@@ -541,7 +586,8 @@ class PaymentController {
         return;
       }
 
-      console.log('✅ MP Client inicializado correctamente');
+      /* console.log('✅ MP Client inicializado correctamente'); */
+
 
       res.json({
         message: 'Mercado Pago configuration is working correctly',
@@ -595,12 +641,14 @@ class PaymentController {
         throw new Error(`Invalid payment ID: ${paymentId}`);
       }
 
-      console.log('Fetching payment from MP with ID:', numericPaymentId);
+      /* console.log('Fetching payment from MP with ID:', numericPaymentId); */
+
 
       // 🔧 NUEVA SINTAXIS PARA OBTENER PAGO
       const response = await payment.get({ id: numericPaymentId });
       
-      console.log('MP Response:', JSON.stringify(response, null, 2));
+      /* console.log('MP Response:', JSON.stringify(response, null, 2)); */
+
       
       return response as MercadoPagoPaymentStatus;
     } catch (error: any) {
@@ -660,8 +708,10 @@ class PaymentController {
     mpPayment: MercadoPagoPaymentStatus
   ): Promise<void> {
     try {
-      console.log('=== PROCESANDO ESTADO DEL PAGO ===');
-      console.log('Estado MP:', mpPayment.status);
+      /* console.log('=== PROCESANDO ESTADO DEL PAGO ==='); */
+
+      /* console.log('Estado MP:', mpPayment.status); */
+
 
       switch (mpPayment.status) {
         case 'approved':
@@ -679,7 +729,8 @@ class PaymentController {
           break;
           
         default:
-          console.log(`Estado no manejado: ${mpPayment.status}`);
+          /* console.log(`Estado no manejado: ${mpPayment.status}`); */
+
       }
     } catch (error) {
       console.error('Error processing payment status:', error);
@@ -696,10 +747,14 @@ class PaymentController {
     mpPayment: MercadoPagoPaymentStatus
   ): Promise<void> {
     try {
-      console.log('=== ACTIVANDO PLAN DEL ESTUDIANTE ===');
-      console.log('Student ID:', payment.studentId);
-      console.log('Plan:', payment.plan);
-      console.log('Monto confirmado:', mpPayment.transaction_amount);
+      /* console.log('=== ACTIVANDO PLAN DEL ESTUDIANTE ==='); */
+
+      /* console.log('Student ID:', payment.studentId); */
+
+      /* console.log('Plan:', payment.plan); */
+
+      /* console.log('Monto confirmado:', mpPayment.transaction_amount); */
+
 
       // 🔧 MANEJAR CAMPOS OPCIONALES DE MP
       const confirmedAmount = mpPayment.transaction_amount || payment.amount;
@@ -745,7 +800,8 @@ class PaymentController {
       };
 
       await db.collection('payments').doc(payment.id).update(paymentUpdateData);
-      console.log('✅ Pago actualizado como facturado');
+      /* console.log('✅ Pago actualizado como facturado'); */
+
 
       // 2. Actualizar el estudiante con fechas específicas según el plan
       const studentRef = db.collection('students').doc(payment.studentId);
@@ -754,11 +810,16 @@ class PaymentController {
       const fechaPago = new Date(); // Usar la fecha actual como fecha de pago confirmado
       const { fechaDesde, fechaHasta } = calcularFechasPlan(payment.plan, confirmedAmount, fechaPago);
       
-      console.log('Fechas calculadas:');
-      console.log('  - Plan:', payment.plan);
-      console.log('  - Es pase diario:', isPaseDiario(payment.plan, confirmedAmount));
-      console.log('  - Fecha desde:', fechaDesde.toDate().toISOString());
-      console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString());
+      /* console.log('Fechas calculadas:'); */
+
+      /* console.log('  - Plan:', payment.plan); */
+
+      /* console.log('  - Es pase diario:', isPaseDiario(payment.plan, confirmedAmount)); */
+
+      /* console.log('  - Fecha desde:', fechaDesde.toDate().toISOString()); */
+
+      /* console.log('  - Fecha hasta:', fechaHasta.toDate().toISOString()); */
+
       
       // Actualizar el estudiante - MISMA ESTRUCTURA QUE confirmPayment
       const studentUpdateData: any = {
@@ -772,9 +833,11 @@ class PaymentController {
         activo: true
       };
       
-      console.log('Datos de actualización del estudiante:', studentUpdateData);
+      /* console.log('Datos de actualización del estudiante:', studentUpdateData); */
+
       await studentRef.update(studentUpdateData);
-      console.log('✅ Plan y membresía del estudiante activados exitosamente');
+      /* console.log('✅ Plan y membresía del estudiante activados exitosamente'); */
+
 
       // 3. Crear notificación
       await PaymentController.createNotification(payment, mpPayment, 'plan_activated');
@@ -793,7 +856,8 @@ class PaymentController {
     mpPayment: MercadoPagoPaymentStatus
   ): Promise<void> {
     try {
-      console.log('=== CANCELANDO PLAN DEL ESTUDIANTE ===');
+      /* console.log('=== CANCELANDO PLAN DEL ESTUDIANTE ==='); */
+
       
       // 1. Actualizar el pago
       await db.collection('payments').doc(payment.id).update({
@@ -808,7 +872,8 @@ class PaymentController {
         activo: false,
       });
 
-      console.log('✅ Plan del estudiante cancelado');
+      /* console.log('✅ Plan del estudiante cancelado'); */
+
 
       // 3. Crear notificación
       await PaymentController.createNotification(payment, mpPayment, 'payment_failed');
@@ -827,7 +892,8 @@ class PaymentController {
       await db.collection('payments').doc(paymentId).update({
         status: status,
       });
-      console.log(`✅ Estado del pago actualizado a: ${status}`);
+      /* console.log(`✅ Estado del pago actualizado a: ${status}`); */
+
     } catch (error) {
       console.error('Error updating payment status:', error);
       throw error;
@@ -862,7 +928,8 @@ class PaymentController {
       };
 
       await db.collection('notifications').add(notificationData);
-      console.log(`✅ Notificación ${type} creada`);
+      /* console.log(`✅ Notificación ${type} creada`); */
+
       
     } catch (error) {
       console.error('Error creating notification:', error);

@@ -74,49 +74,59 @@ const AdminLayout: React.FC = () => {
       // Primero, obtener el nombre del plan basado en el ID
       const plan = plans.find(p => p.id === planId);
       if (!plan) {
-        console.log('❌ Plan no encontrado');
+        /* console.log('❌ Plan no encontrado'); */
+
         return 0;
       }
 
-      console.log('Plan encontrado:', plan.name);
+      /* console.log('Plan encontrado:', plan.name); */
+
 
       const studentsRef = collection(db, 'students');
       let totalCount = 0;
 
       // Búsqueda 1: Por campo 'plan' directo (string)
-      console.log('🔍 Buscando por campo plan =', plan.name);
+      /* console.log('🔍 Buscando por campo plan =', plan.name); */
+
       let q = query(studentsRef, where('plan', '==', plan.name));
       let snapshot = await getDocs(q);
       totalCount += snapshot.size;
       
       if (snapshot.size > 0) {
-        console.log(`✅ Encontrados ${snapshot.size} estudiantes con plan="${plan.name}"`);
+        /* console.log(`✅ Encontrados ${snapshot.size} estudiantes con plan="${plan.name}"`); */
+
         snapshot.docs.forEach(doc => {
-          console.log(`📍 Estudiante: ${doc.data().fullName || doc.data().name || 'Sin nombre'}`);
+          /* console.log(`📍 Estudiante: ${doc.data().fullName || doc.data().name || 'Sin nombre'}`); */
+
         });
       }
 
       // Búsqueda 2: Por campo 'membresia.nombre'
-      console.log('🔍 Buscando por membresia.nombre =', plan.name);
+      /* console.log('🔍 Buscando por membresia.nombre =', plan.name); */
+
       q = query(studentsRef, where('membresia.nombre', '==', plan.name));
       snapshot = await getDocs(q);
       
       if (snapshot.size > 0) {
-        console.log(`✅ Encontrados ${snapshot.size} estudiantes adicionales con membresia.nombre="${plan.name}"`);
+        /* console.log(`✅ Encontrados ${snapshot.size} estudiantes adicionales con membresia.nombre="${plan.name}"`); */
+
         snapshot.docs.forEach(doc => {
           const studentData = doc.data();
           // Verificar si ya no lo contamos en la búsqueda anterior
           if (studentData.plan !== plan.name) {
             totalCount += 1;
-            console.log(`📍 Estudiante adicional: ${studentData.fullName || studentData.name || 'Sin nombre'}`);
+            /* console.log(`📍 Estudiante adicional: ${studentData.fullName || studentData.name || 'Sin nombre'}`); */
+
           }
         });
       } else {
-        console.log('ℹ️ No se encontraron estudiantes adicionales por membresia.nombre');
+        /* console.log('ℹ️ No se encontraron estudiantes adicionales por membresia.nombre'); */
+
       }
 
       // Búsqueda 3: Verificación exhaustiva para debug
-      console.log('🔍 Verificación exhaustiva para debug...');
+      /* console.log('🔍 Verificación exhaustiva para debug...'); */
+
       const allStudentsSnapshot = await getDocs(studentsRef);
       let debugCount = 0;
       
@@ -124,7 +134,8 @@ const AdminLayout: React.FC = () => {
         const student = doc.data();
         if (student.plan === plan.name || student.membresia?.nombre === plan.name) {
           debugCount++;
-          console.log(`🔎 Debug - Estudiante: ${student.fullName || student.name || 'Sin nombre'}, Plan: "${student.plan}", Membresía: "${student.membresia?.nombre}"`);
+          /* console.log(`🔎 Debug - Estudiante: ${student.fullName || student.name || 'Sin nombre'}, Plan: "${student.plan}", Membresía: "${student.membresia?.nombre}"`); */
+
         }
       });
 

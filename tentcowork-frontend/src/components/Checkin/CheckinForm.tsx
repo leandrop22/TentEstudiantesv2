@@ -143,7 +143,8 @@ export const CheckInForm = () => {
         themeColorMeta.content = '#004225'; // Verde de Tent para check-in
       }
       
-      console.log('✅ PWA configurada para check-in');
+      /* console.log('✅ PWA configurada para check-in'); */
+
     };
 
     changeManifestForCheckIn();
@@ -163,7 +164,8 @@ export const CheckInForm = () => {
         themeColorMeta.content = '#004225'; // O el color original que tengas
       }
       
-      console.log('🔄 PWA restaurada a configuración original');
+      /* console.log('🔄 PWA restaurada a configuración original'); */
+
     };
   }, []);
 
@@ -213,7 +215,8 @@ export const CheckInForm = () => {
   // Función para verificar si está dentro del horario permitido
   const verificarHorarioPermitido = (plan: any) => {
     if (!plan || !plan.startHour || !plan.endHour) {
-      console.log('❌ Plan sin horarios definidos', plan);
+      /* console.log('❌ Plan sin horarios definidos', plan); */
+
       return {
         permitido: false,
         mensaje: 'Plan sin horarios definidos'
@@ -229,22 +232,30 @@ export const CheckInForm = () => {
     const horaInicio = parseInt(startHour); // ej: "08:00" -> 800
     const horaFin = parseInt(endHour); // ej: "21:30" -> 2130
 
-    console.log('=== VERIFICACIÓN DE HORARIOS ===');
-    console.log('Hora actual:', ahora.toLocaleTimeString());
-    console.log('Hora actual (numérica):', horaActual);
-    console.log('Horario del plan:', `${plan.startHour} - ${plan.endHour}`);
-    console.log('Hora inicio (numérica):', horaInicio);
-    console.log('Hora fin (numérica):', horaFin);
+    /* console.log('=== VERIFICACIÓN DE HORARIOS ==='); */
+
+    /* console.log('Hora actual:', ahora.toLocaleTimeString()); */
+
+    /* console.log('Hora actual (numérica):', horaActual); */
+
+    /* console.log('Horario del plan:', `${plan.startHour} - ${plan.endHour}`); */
+
+    /* console.log('Hora inicio (numérica):', horaInicio); */
+
+    /* console.log('Hora fin (numérica):', horaFin); */
+
 
     // Verificar si está dentro del horario
     if (horaActual >= horaInicio && horaActual <= horaFin) {
-      console.log('✅ Acceso dentro del horario permitido');
+      /* console.log('✅ Acceso dentro del horario permitido'); */
+
       return {
         permitido: true,
         mensaje: `Acceso permitido (${plan.startHour} - ${plan.endHour})`
       };
     } else {
-      console.log('❌ Acceso fuera del horario permitido');
+      /* console.log('❌ Acceso fuera del horario permitido'); */
+
       return {
         permitido: false,
         mensaje: `Acceso fuera del horario permitido. Tu plan "${plan.name || 'actual'}" permite acceso de ${plan.startHour} a ${plan.endHour}`
@@ -266,10 +277,14 @@ export const CheckInForm = () => {
     const desde = convertirADate(membresia.fechaDesde);
     const hasta = convertirADate(membresia.fechaHasta);
 
-    console.log('=== VERIFICACIÓN DE MEMBRESÍA ===');
-    console.log('Hoy:', hoy.toISOString());
-    console.log('Desde:', desde?.toISOString() || 'null');
-    console.log('Hasta:', hasta?.toISOString() || 'null');
+    /* console.log('=== VERIFICACIÓN DE MEMBRESÍA ==='); */
+
+    /* console.log('Hoy:', hoy.toISOString()); */
+
+    /* console.log('Desde:', desde?.toISOString() || 'null'); */
+
+    /* console.log('Hasta:', hasta?.toISOString() || 'null'); */
+
 
     if (!desde || !hasta) {
       return {
@@ -281,7 +296,8 @@ export const CheckInForm = () => {
 
     // Verificar si está en el período de vigencia
     if (hoy < desde) {
-      console.log('❌ Membresía aún no activada (fecha futura)');
+      /* console.log('❌ Membresía aún no activada (fecha futura)'); */
+
       return {
         status: 'pendiente',
         diasRestantes: 0,
@@ -290,7 +306,8 @@ export const CheckInForm = () => {
     }
 
     if (hoy > hasta) {
-      console.log('❌ Membresía vencida');
+      /* console.log('❌ Membresía vencida'); */
+
       return {
         status: 'vencida',
         diasRestantes: 0,
@@ -302,11 +319,14 @@ export const CheckInForm = () => {
     const diferencia = hasta.getTime() - hoy.getTime();
     const diasRestantes = Math.ceil(diferencia / (1000 * 3600 * 24));
 
-    console.log('✅ Membresía válida');
-    console.log('Días restantes:', diasRestantes);
+    /* console.log('✅ Membresía válida'); */
+
+    /* console.log('Días restantes:', diasRestantes); */
+
 
     if (diasRestantes <= 7) {
-      console.log('⚠️ Membresía por vencer');
+      /* console.log('⚠️ Membresía por vencer'); */
+
       return {
         status: 'por_vencer',
         diasRestantes,
@@ -314,7 +334,8 @@ export const CheckInForm = () => {
       };
     }
 
-    console.log('✅ Membresía activa');
+    /* console.log('✅ Membresía activa'); */
+
     return {
       status: 'activa',
       diasRestantes,
@@ -341,10 +362,14 @@ export const CheckInForm = () => {
     try {
       const student: Student = await checkStudentStatus(code);
       
-      console.log('=== ESTUDIANTE OBTENIDO ===');
-      console.log('Datos del estudiante:', student);
-      console.log('Membresía:', student?.membresia);
-      console.log('Plan:', student?.plan);
+      /* console.log('=== ESTUDIANTE OBTENIDO ==='); */
+
+      /* console.log('Datos del estudiante:', student); */
+
+      /* console.log('Membresía:', student?.membresia); */
+
+      /* console.log('Plan:', student?.plan); */
+
 
       // Verificar que el estudiante tiene los datos necesarios
       if (!student) {
@@ -353,7 +378,8 @@ export const CheckInForm = () => {
 
       // Verificar estado de membresía usando las fechas (compatible con string y Timestamp)
       const estadoMembresia = verificarEstadoMembresia(student.membresia);
-      console.log('Estado de membresía calculado:', estadoMembresia);
+      /* console.log('Estado de membresía calculado:', estadoMembresia); */
+
 
       // Si la membresía no está activa, rechazar el acceso
       if (estadoMembresia.status === 'vencida') {

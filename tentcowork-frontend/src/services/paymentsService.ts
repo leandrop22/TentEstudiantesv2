@@ -21,7 +21,8 @@ export class PaymentService {
    */
   static async createMercadoPagoPreference(paymentData: PaymentData): Promise<MercadoPagoResponse> {
     try {
-      console.log('🏗️ Creando preferencia de MP con datos:', paymentData);
+      /* console.log('🏗️ Creando preferencia de MP con datos:', paymentData); */
+
       
       const requestData = {
         paymentData: {
@@ -47,7 +48,8 @@ export class PaymentService {
       }
 
       const data = await response.json();
-      console.log('✅ Preferencia creada exitosamente:', data);
+      /* console.log('✅ Preferencia creada exitosamente:', data); */
+
       
       return data;
     } catch (error) {
