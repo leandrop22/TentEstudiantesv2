@@ -1051,7 +1051,9 @@ const PaymentsTable: React.FC = () => {
                               </button>
                             </>
                           ) : (
+                            
                             <>
+                            { /*
                               <button
                                 onClick={() => startEditing(payment)}
                                 className="text-tent-orange hover:text-tent-orange/80 transition-colors p-1 rounded"
@@ -1067,7 +1069,9 @@ const PaymentsTable: React.FC = () => {
                                 >
                                   <Trash2 size={16} />
                                 </button>
-                              )}
+                            )}
+                                 */  }
+                              
                             </>
                           )}
                         </div>
