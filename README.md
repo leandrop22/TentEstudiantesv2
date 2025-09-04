@@ -1,6 +1,6 @@
 # 🏢 TentCowork - Sistema de Membresías
 
-Sistema de gestión para espacios de coworking que permite a los estudiantes acceder al espacio mediante códigos de acceso, gestionar sus membresías y realizar pagos.
+Sistema de gestión para espacios de coworking que permite a los estudiantes acceder al espacio mediante códigos de acceso, gestionar sus membresías y realizar pagos en recepción o por mercado pago hospedado.
 
 ## 📋 Descripción
 
