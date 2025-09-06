@@ -41,17 +41,11 @@ Actualmente, **TentCowork** ya lo utiliza con éxito para gestionar a sus estudi
 
 ## 🖼️ Recorrido del Sistema  
 
-### 🔐 Login  
-<img src="./docs/imagenes/image-1.png" alt="Login" width="300"/>
+### 🔐 Login                                                                                 ### 📝 Registro de Usuario
+<img src="./docs/imagenes/image-1.png" alt="Login" width="300"/>                      <img src="./docs/imagenes/image.png" alt="Registro de Usuario" width="300"/>
 
-### 📝 Registro de Usuario  
-<img src="./docs/imagenes/image.png" alt="Registro de Usuario" width="300"/>
-
-### 👤 Perfil del Estudiante  
-<img src="./docs/imagenes/image-2.png" alt="Perfil del Estudiante" width="300"/>
-
-### 📊 Panel de Administración  
-<img src="./docs/imagenes/image-3.png" alt="Panel de Administración" width="400"/>
+### 👤 Perfil del Estudiante                                                                 ### 📊 Panel de Administración  
+<img src="./docs/imagenes/image-2.png" alt="Perfil del Estudiante" width="300"/>      <img src="./docs/imagenes/image-3.png" alt="Panel de Administración" width="400"/>
 
 ### ✅ Check-in / Check-out  
 <img src="./docs/imagenes/image-4.png" alt="Check-in Check-out" width="300"/>
