@@ -46,7 +46,7 @@ Actualmente, **TentCowork** ya lo utiliza con éxito para gestionar a sus estudi
 
 | 👤 Perfil del Estudiante | 📊 Panel de Administración |
 |-------------------------|----------------------------|
-| <img src="./docs/imagenes/image-2.png" alt="Perfil del Estudiante" width="300"/> | <img src="./docs/imagenes/image-3.png" alt="Panel de Administración" width="400"/> |
+| <img src="./docs/imagenes/image-2.png" alt="Perfil del Estudiante" width="300"/> | <img src="./docs/imagenes/image-3.png" alt="Panel de Administración" width="500"/> |
 
 | ✅ Check-in / Check-out |  |
 |------------------------|--|
