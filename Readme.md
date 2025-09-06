@@ -1,67 +1,66 @@
-🏢 Sistema de Membresías – Solución Integral para tu Negocio
+# 🏢 Sistema de Membresías – Solución Integral para tu Negocio  
 
-Desarrollado por: Leandro Petricca
+📩 **Contacto directo**  
+- **Desarrollador**: Leandro Petricca  
+- **Email**: leandropetricca123@gmail.com  
+- **Teléfono**: 2616826408  
+- **LinkedIn**: [José Leandro Petricca de Luca](https://www.linkedin.com/in/jos%C3%A9-leandro-petricca-de-luca-638a50230/)  
 
-📩 Email: leandropetricca123@gmail.com
+---
 
-📱 Teléfono: 2616826408
-🔗 LinkedIn: linkedin.com/in/josé-leandro-petricca-de-luca-638a50230
+## ✨ Qué es este sistema
+Una plataforma digital diseñada para espacios con planes de suscripción: **coworkings, gimnasios, academias, estudios de yoga, talleres** y mucho más.  
 
-✨ ¿Qué es este sistema?
+Actualmente, **TentCowork** ya lo utiliza con éxito para gestionar a sus estudiantes de forma ágil y segura.  
 
-Una plataforma digital diseñada para espacios con planes de suscripción: coworkings, gimnasios, academias, estudios de yoga, talleres y mucho más.
+---
 
-👉 Actualmente, TentCowork ya lo utiliza con éxito para gestionar a sus estudiantes de forma ágil y segura.
+## 🔑 Beneficios Clave
+- 🏷️ **Check-in/Check-out** con códigos aleatorios de 5 dígitos.  
+- 📅 **Gestión de membresías**: contratar, renovar y administrar planes desde un mismo lugar.  
+- 💳 **Pagos flexibles**: integración con **Mercado Pago** o registro manual en recepción.  
+- 📊 **Panel de administración inteligente**: controla pagos, gestiona usuarios y genera estadísticas.  
+- 📈 **Métricas en tiempo real** para optimizar el uso de tu espacio.  
 
-🚀 Beneficios Clave
+---
 
-🔑 Check-in/Check-out sencillo: acceso con códigos aleatorios de 5 dígitos.
+## 👥 A quién está dirigido
+- 🏢 Espacios de coworking  
+- 🏋️ Gimnasios  
+- 🎭 Academias y talleres  
+- 🧘 Estudios de yoga y danza  
+- 🏫 Cualquier negocio que funcione con **planes de membresía**  
 
-🧾 Gestión de membresías: contrata, renueva y administra planes desde un mismo lugar.
+---
 
-💳 Pagos flexibles: integración con Mercado Pago y opción de pagos en recepción.
+## 💰 Modalidades de uso
+- **Licencia mensual fija** 💵 (costo bajo y predecible).  
+- **Modelo por comisión** 📊 (solo pagás un % de las membresías cobradas).  
 
-📊 Panel de administración completo: estadísticas, control de pagos y gestión centralizada.
+---
 
-👥 Métricas de asistencia en tiempo real: entendé cómo se usan tus espacios.
+## 🖼️ Recorrido del Sistema  
 
-👥 ¿A quién está dirigido?
+### 🔐 Login  
+<img src="./docs/imagenes/image-1.png" alt="Login" width="300"/>
 
-Espacios de coworking
+### 📝 Registro de Usuario  
+<img src="./docs/imagenes/image-2.png" alt="Registro de Usuario" width="300"/>
 
-Gimnasios
+### 👤 Perfil del Estudiante  
+<img src="./docs/imagenes/image-3.png" alt="Perfil del Estudiante" width="300"/>
 
-Academias y talleres
+### 📊 Panel de Administración  
+<img src="./docs/imagenes/image-4.png" alt="Panel de Administración" width="400"/>
 
-Estudios de yoga / danza
+### ✅ Check-in / Check-out  
+<img src="./docs/imagenes/image.png" alt="Check-in Check-out" width="300"/>
 
-Cualquier negocio que funcione con planes de membresía
+---
 
-💰 Modalidades de uso
-
-Licencia mensual fija por el uso del sistema.
-
-Modelo por comisión, donde solo pagás un % de las membresías cobradas.
-
-📸 Recorrido del Sistema
-
-(Espacios reservados para imágenes/screenshots de tu app — reemplazá con capturas reales)
-
-🔐 Login
-
-📝 Registro de Usuario
-
-👤 Perfil del Estudiante
-
-🖥️ Panel de Administración
-
-✅ Check-in/Check-out
-
-🌟 Por qué elegir este sistema
-
-✔ Profesional, escalable y seguro
-✔ Aumenta la eficiencia administrativa
-✔ Mejora la experiencia de tus clientes
-✔ Soporte directo con el desarrollador
-
-💡 Sistema de membresías moderno y flexible, creado para que gestiones tu negocio de forma más simple, rentable y profesional.
+## 🚀 Por qué elegir este sistema
+- 🌟 **Profesional, escalable y seguro**  
+- ⚡ **Aumenta la eficiencia administrativa**  
+- ❤️ **Mejora la experiencia de tus clientes**  
+- 📞 **Soporte directo con el desarrollador**  
+- 🔧 **Sistema moderno y flexible** para gestionar membresías de forma simple y profesional  
