@@ -23,7 +23,23 @@ Una plataforma digital diseñada para espacios con planes de suscripción: cowor
 
 📊 Panel de administración completo: estadísticas, control de pagos y gestión centralizada.
 
-👥 Métricas de asistencia en tiempo real: entendé cómo se usan tus espacios.
+👥 Métricas de asistencia en tiempo real: entendé cómo se usan tus espacios. (ejemplo Tent)
+
+Estudiantes por día: 30-40
+
+Horario de operación: 8:00 - 21:30
+
+Sesiones diarias: ~60-80 check-ins/check-outs
+
+Costo de infraestructura: ~$0-5/mes (tier gratuito)
+
+Performance:
+
+Cold start: ~1-2 segundos
+
+Consultas normales: <500ms
+
+Instancias activas: 1-2 durante horario laboral
 
 👥 ¿A quién está dirigido?
 
