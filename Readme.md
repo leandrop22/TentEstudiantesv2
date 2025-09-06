@@ -1,41 +1,66 @@
-# 🏢 Sistema de Membresías – Desarrollado por Leandro Petricca
+🏢 Sistema de Membresías – Solución Integral para tu Negocio
 
-Este sistema de gestión de membresías está pensado para adaptarse a espacios como coworkings, gimnasios, academias, estudios de yoga, talleres y cualquier lugar que funcione con planes de suscripción.  
+Desarrollado por: Leandro Petricca
 
-Actualmente, **TentCowork** es uno de los espacios que lo utiliza para gestionar estudiantes de manera ágil y segura.  
+📩 Email: leandropetricca123@gmail.com
 
-## ✨ Qué ofrece el sistema
+📱 Teléfono: 2616826408
+🔗 LinkedIn: linkedin.com/in/josé-leandro-petricca-de-luca-638a50230
 
-- **Check-in/Check-out fácil**: Acceso con códigos aleatorios de 5 dígitos, únicos para cada usuario.  
-- **Gestión de membresías**: Contrata, renueva y controla los planes de tus clientes de manera digital.  
-- **Pagos flexibles**: Integración completa con Mercado Pago y opción de **“pagar en recepción”**, donde el administrador puede registrar pagos manualmente.  
-- **Panel de administración inteligente**: Visualiza estadísticas, controla pagos y organiza a tus miembros.  
-- **Control de asistencia y métricas**: Optimiza el uso del espacio y conoce el comportamiento de tus usuarios en tiempo real.
+✨ ¿Qué es este sistema?
 
-## 👥 Para quién es
+Una plataforma digital diseñada para espacios con planes de suscripción: coworkings, gimnasios, academias, estudios de yoga, talleres y mucho más.
 
-- Espacios que funcionan con membresías: coworkings, gimnasios, academias, talleres, estudios de yoga, etc.  
-- Administradores que quieren simplificar la gestión diaria y tener control total sobre membresías y pagos.
+👉 Actualmente, TentCowork ya lo utiliza con éxito para gestionar a sus estudiantes de forma ágil y segura.
 
-## 💰 Modalidades de venta
+🚀 Beneficios Clave
 
-- **Pago fijo mensual** por el uso del sistema.  
-- **Por comisión**, obteniendo un porcentaje sobre las membresías vendidas a través del sistema.
+🔑 Check-in/Check-out sencillo: acceso con códigos aleatorios de 5 dígitos.
 
-## 🚀 Beneficios principales
+🧾 Gestión de membresías: contrata, renueva y administra planes desde un mismo lugar.
 
-- Mejora la experiencia del usuario: todo desde una interfaz intuitiva.  
-- Facilita la gestión administrativa: menos tareas manuales, más eficiencia.  
-- Pagos y membresías bajo control: información clara y actualizada al instante.  
-- Estadísticas y métricas para tomar decisiones inteligentes sobre tu espacio.
+💳 Pagos flexibles: integración con Mercado Pago y opción de pagos en recepción.
 
----
+📊 Panel de administración completo: estadísticas, control de pagos y gestión centralizada.
 
-## 📞 Contacto
+👥 Métricas de asistencia en tiempo real: entendé cómo se usan tus espacios.
 
-**Desarrollador**: Leandro Petricca  
-- **Email**: leandropetricca123@gmail.com  
-- **Teléfono**: 2616826408  
-- **LinkedIn**: [linkedin.com/in/josé-leandro-petricca-de-luca-638a50230  ](https://www.linkedin.com/in/jos%C3%A9-leandro-petricca-de-luca-638a50230/)
+👥 ¿A quién está dirigido?
 
-*Sistema de membresías profesional, desarrollado por Leandro Petricca, para modernizar la gestión de cualquier espacio con planes de suscripción.*
+Espacios de coworking
+
+Gimnasios
+
+Academias y talleres
+
+Estudios de yoga / danza
+
+Cualquier negocio que funcione con planes de membresía
+
+💰 Modalidades de uso
+
+Licencia mensual fija por el uso del sistema.
+
+Modelo por comisión, donde solo pagás un % de las membresías cobradas.
+
+📸 Recorrido del Sistema
+
+
+🔐 Login  ![alt text](image-1.png)
+
+📝 Registro de Usuario  ![alt text](image.png)
+
+👤 Perfil del Estudiante  ![alt text](image-2.png)
+ 
+🖥️ Panel de Administración ![alt text](image-3.png) 
+
+✅ Check-in/Check-out  ![alt text](image-4.png)
+
+🌟 Por qué elegir este sistema
+
+✔ Profesional, escalable y seguro
+✔ Aumenta la eficiencia administrativa
+✔ Mejora la experiencia de tus clientes
+✔ Soporte directo con el desarrollador
+
+💡 Sistema de membresías moderno y flexible, creado para que gestiones tu negocio de forma más simple, rentable y profesional.

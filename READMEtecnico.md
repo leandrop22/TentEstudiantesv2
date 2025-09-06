@@ -33,8 +33,8 @@ Sistema de gestión para espacios de coworking que permite a los estudiantes acc
 ## 🚀 Despliegue Rápido
 
 ### URLs de Producción
-- **Frontend**: https://tentcowork-estudiantes-v2.web.app/
-- **Backend**: https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend
+- **Frontend**: https://estudiantes.tentcowork.com/
+- **Backend**: SOLICITAR AL ADMIN 
 
 ## 💻 Instalación y Desarrollo
 
@@ -71,7 +71,7 @@ cd ../../tentcowork-frontend
 npm install
 
 # Crear archivo de variables de entorno
-echo "VITE_BACKEND_URL=https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend" > .env
+echo "VITE_BACKEND_URL=------" > .env
 ```
 
 ### 5. Desarrollo Local
@@ -123,7 +123,7 @@ MP_PUBLIC_KEY=tu_public_key_de_mercado_pago
 
 **Frontend** (`tentcowork-frontend/.env`):
 ```env
-VITE_BACKEND_URL=https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend
+VITE_BACKEND_URL=--------
 VITE_MP_PUBLIC_KEY=tu_public_key_de_mercado_pago
 ```
 
@@ -225,7 +225,7 @@ cd tentcowork-frontend && rm -rf dist/
 cd tentcowork-backend/functions && rm -rf dist/
 
 # Verificar URLs del backend
-curl https://us-central1-tentcowork-estudiantes-v2.cloudfunctions.net/backend
+curl ------
 ```
 
 ## 🐛 Solución de Problemas Comunes
