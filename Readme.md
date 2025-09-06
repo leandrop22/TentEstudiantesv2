@@ -41,7 +41,7 @@ Actualmente, **TentCowork** ya lo utiliza con éxito para gestionar a sus estudi
 
 ## 🖼️ Recorrido del Sistema  
 
-### 🔐 Login                                                                                 ### 📝 Registro de Usuario
+### 🔐 Login                                                                       ||          ### 📝 Registro de Usuario
 <img src="./docs/imagenes/image-1.png" alt="Login" width="300"/>                      <img src="./docs/imagenes/image.png" alt="Registro de Usuario" width="300"/>
 
 ### 👤 Perfil del Estudiante                                                                 ### 📊 Panel de Administración  
