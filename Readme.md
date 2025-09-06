@@ -45,6 +45,7 @@ Modelo por comisión, donde solo pagás un % de las membresías cobradas.
 
 📸 Recorrido del Sistema
 
+(Espacios reservados para imágenes/screenshots de tu app — reemplazá con capturas reales)
 
 🔐 Login  ![alt text](image-1.png)
 
