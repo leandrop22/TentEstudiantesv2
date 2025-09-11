@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Plus, Edit2, Trash2, Clock, DollarSign, ChevronDown, ChevronUp, Eye, EyeOff, AlertTriangle, X, Sun, CalendarDays, Info } from 'lucide-react';
+import { Calendar, Plus, Edit2, Trash2, Clock, DollarSign, ChevronDown, ChevronUp, Eye, EyeOff, AlertTriangle, X } from 'lucide-react';
 import { Plan } from '../../types/Plan';
 
 interface Props {
@@ -33,34 +33,18 @@ const PlansEditor: React.FC<Props> = ({
     studentsCount: number;
   }>({ show: false, planId: '', planName: '', studentsCount: 0 });
 
-  // ✅ NUEVA FUNCIÓN: Detectar si es pase diario por nombre y precio
-  const isPaseDiario = (planName: string, price: number = 0) => {
-    const nombre = planName.toLowerCase();
-    return nombre.includes('diario') || 
-           nombre.includes('día') || 
-           nombre.includes('day') ||
-           (nombre.includes('pase') && (nombre.includes('diario') || nombre.includes('día'))) ||
-           price <= 8000; // Criterio adicional por precio
-  };
-
-  // ✅ NUEVA FUNCIÓN: Obtener tipo de plan para mostrar
-  const getTipoPlan = (plan: Plan) => {
-    return isPaseDiario(plan.name, plan.price) ? 'diario' : 'mensual';
-  };
-
-  // ✅ NUEVA FUNCIÓN: Validar configuración del plan
+  // ✅ Validar configuración del plan
   const validatePlanConfig = (plan: Plan) => {
     const errors: string[] = [];
     
-    if (isPaseDiario(plan.name, plan.price)) {
-      // Validaciones específicas para pase diario
+    if (plan.type === 'diario') {
       if (plan.price > 10000) {
         errors.push('Los pases diarios suelen tener un precio menor a $10,000');
       }
-    } else {
-      // Validaciones para planes mensuales
-      if (plan.price < 5000) {
-        errors.push('Los planes mensuales suelen tener un precio mayor a $5,000');
+    } else if (plan.type === 'mensual') {
+      // Permitimos 0 (gratis)
+      if (plan.price < 0) {
+        errors.push('El precio no puede ser negativo');
       }
       if (!plan.days || plan.days.trim() === '') {
         errors.push('Los planes mensuales deben especificar días de la semana');
@@ -71,10 +55,10 @@ const PlansEditor: React.FC<Props> = ({
       errors.push('El nombre del plan es obligatorio');
     }
     
-    if (!plan.price || plan.price <= 0) {
-      errors.push('El precio debe ser mayor a 0');
+    if (plan.price === undefined || plan.price === null) {
+      errors.push('Debes especificar un precio (puede ser 0 para gratis)');
     }
-    
+
     return errors;
   };
 
@@ -136,16 +120,15 @@ const PlansEditor: React.FC<Props> = ({
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
 
-  // ✅ NUEVO: Obtener estadísticas de planes
+  // ✅ Estadísticas de planes
   const planStats = {
     total: plans.length,
-    diarios: plans.filter(p => isPaseDiario(p.name, p.price)).length,
-    mensuales: plans.filter(p => !isPaseDiario(p.name, p.price)).length
+    diarios: plans.filter(p => p.type === 'diario').length,
+    mensuales: plans.filter(p => p.type === 'mensual').length
   };
 
-  // ✅ NUEVO: Validar formulario actual
+  // ✅ Errores actuales
   const currentFormErrors = validatePlanConfig(formData);
-  const isCurrentFormDiario = isPaseDiario(formData.name, formData.price);
 
   return (
     <motion.div
@@ -179,7 +162,7 @@ const PlansEditor: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Formulario Colapsible */}
+      {/* Formulario Colapsable */}
       <AnimatePresence>
         {showForm && (
           <motion.div
@@ -190,50 +173,33 @@ const PlansEditor: React.FC<Props> = ({
             className="bg-gradient-to-br from-green-50 to-orange-50 border-b border-gray-200 overflow-hidden"
           >
             <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-                  <div className="w-1 h-6 bg-green-500 rounded-full mr-3"></div>
-                  {editingId ? 'Editar Plan' : 'Agregar Nuevo Plan'}
-                </h3>
-                
-                {/* ✅ NUEVO: Indicador de tipo de plan */}
-                {formData.name && (
-                  <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
-                    isCurrentFormDiario
-                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                      : 'bg-blue-100 text-blue-800 border border-blue-300'
-                  }`}>
-                    {isCurrentFormDiario ? <Sun size={16} /> : <CalendarDays size={16} />}
-                    <span>Plan {isCurrentFormDiario ? 'Diario' : 'Mensual'}</span>
-                  </div>
-                )}
+              {/* Selector de tipo de plan */}
+              <div className="flex space-x-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, type: 'diario' })}
+                  className={`px-4 py-2 rounded-lg border ${
+                    formData.type === 'diario'
+                      ? 'bg-yellow-100 border-yellow-400 text-yellow-800 font-semibold'
+                      : 'bg-white border-gray-300 text-gray-600'
+                  }`}
+                >
+                  Diario
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, type: 'mensual' })}
+                  className={`px-4 py-2 rounded-lg border ${
+                    formData.type === 'mensual'
+                      ? 'bg-blue-100 border-blue-400 text-blue-800 font-semibold'
+                      : 'bg-white border-gray-300 text-gray-600'
+                  }`}
+                >
+                  Mensual
+                </button>
               </div>
 
-              {/* ✅ NUEVO: Información del tipo de plan detectado */}
-              {formData.name && (
-                <div className={`mb-4 p-3 rounded-lg border ${
-                  isCurrentFormDiario
-                    ? 'bg-yellow-50 border-yellow-200'
-                    : 'bg-blue-50 border-blue-200'
-                }`}>
-                  <div className="flex items-start space-x-2">
-                    <Info size={16} className={`mt-0.5 ${isCurrentFormDiario ? 'text-yellow-600' : 'text-blue-600'}`} />
-                    <div className="text-sm">
-                      <p className={`font-medium ${isCurrentFormDiario ? 'text-yellow-800' : 'text-blue-800'}`}>
-                        {isCurrentFormDiario ? 'Pase Diario Detectado' : 'Plan Mensual Detectado'}
-                      </p>
-                      <p className={`${isCurrentFormDiario ? 'text-yellow-700' : 'text-blue-700'}`}>
-                        {isCurrentFormDiario 
-                          ? 'Vigencia: hasta las 23:59:59 del día de contratación'
-                          : 'Vigencia: 30 días desde la fecha de pago'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ✅ NUEVO: Mostrar errores de validación */}
+              {/* Errores de validación */}
               {currentFormErrors.length > 0 && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex items-start space-x-2">
@@ -250,6 +216,7 @@ const PlansEditor: React.FC<Props> = ({
                 </div>
               )}
               
+              {/* Inputs */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
                 <div className="relative">
                   <input
@@ -297,7 +264,7 @@ const PlansEditor: React.FC<Props> = ({
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Días de la semana {isCurrentFormDiario && <span className="text-yellow-600">(Opcional para pases diarios)</span>}
+                    Días de la semana {formData.type === 'diario' && <span className="text-yellow-600">(Opcional para pases diarios)</span>}
                   </label>
                   <div className="grid grid-cols-7 gap-1">
                     {[
@@ -364,7 +331,7 @@ const PlansEditor: React.FC<Props> = ({
         )}
       </AnimatePresence>
 
-      {/* Lista de Planes - Diseño de Tarjetas */}
+      {/* Lista de Planes */}
       <div className="p-6">
         {plans.length === 0 ? (
           <div className="text-center py-16 text-gray-500">
@@ -381,116 +348,112 @@ const PlansEditor: React.FC<Props> = ({
             </h3>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {plans.map(plan => {
-                const tipoPlan = getTipoPlan(plan);
-                return (
-                  <motion.div
-                    key={plan.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 hover:border-orange-300 transition-all duration-200 hover:shadow-md overflow-hidden"
-                  >
-                    {/* Header de la tarjeta */}
-                    <div className="p-4 border-b border-gray-100">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h4 className="font-semibold text-gray-900 text-lg truncate">
-                              {plan.name}
-                            </h4>
-                            {/* ✅ NUEVO: Badge de tipo de plan */}
-                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                              tipoPlan === 'diario'
-                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                                : 'bg-blue-100 text-blue-800 border border-blue-300'
-                            }`}>
-                              {tipoPlan === 'diario' ? '📅 Diario' : '🗓️ Mensual'}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-4 mt-2">
-                            <span className="text-2xl font-bold text-green-600">
-                              ${plan.price}
-                            </span>
-                            <span className="text-sm px-2 py-1 rounded-full text-gray-500 bg-gray-100">
-                              {formatDays(plan.days)}
-                            </span>
-                          </div>
-                          {/* ✅ NUEVO: Info de vigencia */}
-                          <p className="text-xs text-gray-500 mt-2">
-                            {tipoPlan === 'diario' 
-                              ? 'Vigencia: Hasta las 23:59 del día' 
-                              : 'Vigencia: 30 días desde el pago'
-                            }
-                          </p>
+              {plans.map(plan => (
+                <motion.div
+                  key={plan.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 hover:border-orange-300 transition-all duration-200 hover:shadow-md overflow-hidden"
+                >
+                  {/* Header de la tarjeta */}
+                  <div className="p-4 border-b border-gray-100">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h4 className="font-semibold text-gray-900 text-lg truncate">
+                            {plan.name}
+                          </h4>
+                          {/* Badge de tipo */}
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            plan.type === 'diario'
+                              ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                              : 'bg-blue-100 text-blue-800 border border-blue-300'
+                          }`}>
+                            {plan.type === 'diario' ? '📅 Diario' : '🗓️ Mensual'}
+                          </span>
                         </div>
-                        <div className="flex items-center space-x-1 ml-2">
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleEdit(plan.id, plan)}
-                            className="text-tent-orange hover:text-tent-orange p-2 rounded-lg hover:bg-orange-50 transition-colors"
-                            title="Editar plan"
-                          >
-                            <Edit2 size={16} />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleDeleteClick(plan.id, plan.name)}
-                            className="text-red-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                            title="Eliminar plan"
-                          >
-                            <Trash2 size={16} />
-                          </motion.button>
+                        <div className="flex items-center space-x-4 mt-2">
+                          <span className="text-2xl font-bold text-green-600">
+                            ${plan.price}
+                          </span>
+                          <span className="text-sm px-2 py-1 rounded-full text-gray-500 bg-gray-100">
+                            {formatDays(plan.days)}
+                          </span>
                         </div>
+                        {/* Vigencia */}
+                        <p className="text-xs text-gray-500 mt-2">
+                          {plan.type === 'diario' 
+                            ? 'Vigencia: Hasta las 21:30 del día' 
+                            : 'Vigencia: 30 días desde el pago'}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-1 ml-2">
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => handleEdit(plan.id, plan)}
+                          className="text-tent-orange hover:text-tent-orange p-2 rounded-lg hover:bg-orange-50 transition-colors"
+                          title="Editar plan"
+                        >
+                          <Edit2 size={16} />
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => handleDeleteClick(plan.id, plan.name)}
+                          className="text-red-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Eliminar plan"
+                        >
+                          <Trash2 size={16} />
+                        </motion.button>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Contenido de la tarjeta */}
-                    <div className="p-4">
-                      <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-                        <span className="flex items-center">
-                          <Clock size={14} className="mr-1" />
-                          {plan.startHour} - {plan.endHour}
-                        </span>
-                      </div>
-                      
-                      <div className="text-sm text-gray-700 leading-relaxed">
-                        {expandedPlans.has(plan.id) ? (
-                          <p>{plan.description}</p>
-                        ) : (
-                          <p>{truncateText(plan.description, 80)}</p>
-                        )}
-                        
-                        {plan.description && plan.description.length > 80 && (
-                          <button
-                            onClick={() => togglePlanExpansion(plan.id)}
-                            className="text-orange-500 hover:text-orange-600 text-xs font-medium mt-2 flex items-center"
-                          >
-                            {expandedPlans.has(plan.id) ? (
-                              <>
-                                <ChevronUp size={14} className="mr-1" />
-                                Ver menos
-                              </>
-                            ) : (
-                              <>
-                                <ChevronDown size={14} className="mr-1" />
-                                Ver más
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
+                  {/* Contenido de la tarjeta */}
+                  <div className="p-4">
+                    <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                      <span className="flex items-center">
+                        <Clock size={14} className="mr-1" />
+                        {plan.startHour} - {plan.endHour}
+                      </span>
                     </div>
-                  </motion.div>
-                );
-              })}
+                    
+                    <div className="text-sm text-gray-700 leading-relaxed">
+                      {expandedPlans.has(plan.id) ? (
+                        <p>{plan.description}</p>
+                      ) : (
+                        <p>{truncateText(plan.description, 80)}</p>
+                      )}
+                      
+                      {plan.description && plan.description.length > 80 && (
+                        <button
+                          onClick={() => togglePlanExpansion(plan.id)}
+                          className="text-orange-500 hover:text-orange-600 text-xs font-medium mt-2 flex items-center"
+                        >
+                          {expandedPlans.has(plan.id) ? (
+                            <>
+                              <ChevronUp size={14} className="mr-1" />
+                              Ver menos
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown size={14} className="mr-1" />
+                              Ver más
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal de Confirmación de Borrado */}
+      {/* Modal de confirmación de borrado */}
       <AnimatePresence>
         {deleteConfirmation.show && (
           <motion.div
@@ -532,7 +495,7 @@ const PlansEditor: React.FC<Props> = ({
                       <strong>No se puede eliminar este plan.</strong>
                     </p>
                     <p className="text-red-700 text-sm mt-2">
-                      Hay <strong>{deleteConfirmation.studentsCount} estudiante{deleteConfirmation.studentsCount !== 1 ? 's' : ''}</strong> {' '}
+                      Hay <strong>{deleteConfirmation.studentsCount} estudiante{deleteConfirmation.studentsCount !== 1 ? 's' : ''}</strong>{' '}
                       asignado{deleteConfirmation.studentsCount !== 1 ? 's' : ''} a este plan. 
                       Primero debes reasignar o eliminar estos estudiantes.
                     </p>

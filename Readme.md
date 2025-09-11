@@ -1,83 +1,66 @@
-🏢 Sistema de Membresías – Solución Integral para tu Negocio
+# 🏢 Sistema de Membresías – Solución Integral para tu Negocio  
 
-Desarrollado por: Leandro Petricca
+**Desarrollado por Leandro Petricca**  
+📧 **Email**: leandropetricca123@gmail.com  
+📱 **Teléfono**: 2616826408  
+🔗 **LinkedIn**: [linkedin.com/in/josé-leandro-petricca-de-luca-638a50230](https://www.linkedin.com/in/jos%C3%A9-leandro-petricca-de-luca-638a50230/)  
 
-📩 Email: leandropetricca123@gmail.com
+---
 
-📱 Teléfono: 2616826408
-🔗 LinkedIn: linkedin.com/in/josé-leandro-petricca-de-luca-638a50230
+## ✨ ¿Qué es este sistema?
+Una plataforma digital diseñada para negocios con planes de suscripción como coworkings, gimnasios, academias, estudios de yoga, talleres y más.  
 
-✨ ¿Qué es este sistema?
+Actualmente, **TentCowork** la utiliza para gestionar estudiantes de forma ágil y segura.  
 
-Una plataforma digital diseñada para espacios con planes de suscripción: coworkings, gimnasios, academias, estudios de yoga, talleres y mucho más.
+---
 
-👉 Actualmente, TentCowork ya lo utiliza con éxito para gestionar a sus estudiantes de forma ágil y segura.
+## 🚀 Beneficios principales
 
-🚀 Beneficios Clave
+✅ **Check-in/Check-out ágil** → con códigos aleatorios de 5 dígitos.  
+✅ **Gestión de membresías** → contratación, renovación y control de planes.  
+✅ **Pagos flexibles** → Mercado Pago integrado y opción de pagar en recepción.  
+✅ **Panel de administración inteligente** → métricas y control centralizado.  
+✅ **Asistencia y estadísticas en tiempo real** → optimizá el uso de tu espacio.  
 
-🔑 Check-in/Check-out sencillo: acceso con códigos aleatorios de 5 dígitos.
+---
 
-🧾 Gestión de membresías: contrata, renueva y administra planes desde un mismo lugar.
+## 👥 ¿Para quién es?
 
-💳 Pagos flexibles: integración con Mercado Pago y opción de pagos en recepción.
+- Espacios de coworking  
+- Gimnasios y estudios de yoga  
+- Academias y talleres  
+- Cualquier negocio con planes de membresía  
 
-📊 Panel de administración completo: estadísticas, control de pagos y gestión centralizada.
+---
 
-👥 Métricas de asistencia en tiempo real: entendé cómo se usan tus espacios. (ejemplo Tent)
+## 💰 Modalidades de venta
 
-Estudiantes por día: 30-40
+💵 **Licencia fija mensual**  
+📊 **Comisión por uso** (% de membresías gestionadas en el sistema)  
 
-Horario de operación: 8:00 - 21:30
+---
 
-Sesiones diarias: ~60-80 check-ins/check-outs
+## 🖼️ Capturas del sistema
 
-Costo de infraestructura: ~$0-5/mes (tier gratuito)
+### 🔑 Login
+![Login](/docs/imagenes/image.png)
 
-Performance:
+### 📝 Registro
+![Registro](/docs/imagenes/image-1.png)
 
-Cold start: ~1-2 segundos
+### 👤 Perfil del estudiante
+![Perfil del estudiante](/docs/imagenes/image-2.png)
 
-Consultas normales: <500ms
+### 📊 Panel de administración
+![Panel de administración](/docs/imagenes/image-3.png)
 
-Instancias activas: 1-2 durante horario laboral
+### 🎫 Check-in
+![Check-in](/docs/imagenes/image-4.png)
 
-👥 ¿A quién está dirigido?
+---
 
-Espacios de coworking
+## 🎯 Conclusión
 
-Gimnasios
+El **Sistema de Membresías** es una solución profesional, lista para usarse y adaptarse a cualquier espacio que funcione con planes de suscripción.  
 
-Academias y talleres
-
-Estudios de yoga / danza
-
-Cualquier negocio que funcione con planes de membresía
-
-💰 Modalidades de uso
-
-Licencia mensual fija por el uso del sistema.
-
-Modelo por comisión, donde solo pagás un % de las membresías cobradas.
-
-📸 Recorrido del Sistema
-
-(Espacios reservados para imágenes/screenshots de tu app — reemplazá con capturas reales)
-
-🔐 Login  ![alt text](image-1.png)
-
-📝 Registro de Usuario  ![alt text](image.png)
-
-👤 Perfil del Estudiante  ![alt text](image-2.png)
- 
-🖥️ Panel de Administración ![alt text](image-3.png) 
-
-✅ Check-in/Check-out  ![alt text](image-4.png)
-
-🌟 Por qué elegir este sistema
-
-✔ Profesional, escalable y seguro
-✔ Aumenta la eficiencia administrativa
-✔ Mejora la experiencia de tus clientes
-✔ Soporte directo con el desarrollador
-
-💡 Sistema de membresías moderno y flexible, creado para que gestiones tu negocio de forma más simple, rentable y profesional.
+📩 **Contactame hoy mismo** y llevá la gestión de tu negocio al siguiente nivel.

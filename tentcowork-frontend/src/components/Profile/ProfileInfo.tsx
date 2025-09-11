@@ -61,6 +61,56 @@ export default function ProfileInfo() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Activar un plan gratuito (precio = 0) para el estudiante actual.  Calcula las
+   * fechas de vigencia utilizando la función calcularFechasPlan y actualiza
+   * los datos de la membresía en Firestore.  También actualiza el estado
+   * local para reflejar la membresía activa.
+   */
+  const handleActivateFreePlan = async (plan: Plan) => {
+    if (!estudiante) return;
+    setPaymentLoading(true);
+    try {
+      // Utilizar la misma lógica de cálculo de fechas que en otras compras
+      const { fechaDesde, fechaHasta } = calcularFechasPlan(plan.name, plan.price, new Date());
+      await updateDoc(doc(db, 'students', estudiante.uid), {
+        plan: plan.name,
+        'membresia.nombre': plan.name,
+        'membresia.estado': 'activa',
+        'membresia.montoPagado': 0,
+        'membresia.medioPago': 'Gratuito',
+        'membresia.fechaDesde': fechaDesde,
+        'membresia.fechaHasta': fechaHasta,
+        activo: true
+      });
+
+      // Actualizar el estado local del estudiante
+      setEstudiante(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          plan: plan.name,
+          membresia: {
+            nombre: plan.name,
+            estado: 'activa',
+            montoPagado: 0,
+            medioPago: 'Gratuito',
+            fechaDesde,
+            fechaHasta
+          }
+        } as Estudiante;
+      });
+      setMensaje('✅ Plan gratuito activado con éxito.');
+      setShowPaymentModal(false);
+      setSelectedPlan(null);
+    } catch (error: any) {
+      console.error('❌ Error activando plan gratuito:', error);
+      setMensaje('❌ Error al activar plan gratuito: ' + error.message);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   // ✅ FUNCIÓN: Detectar si es pase diario
   const isPaseDiario = (planName: string, price: number = 0) => {
     const nombre = planName.toLowerCase();
@@ -703,6 +753,7 @@ export default function ProfileInfo() {
         onMessage={setMensaje}
         onPayWithMercadoPago={handlePayWithMercadoPago}
         onPayWithCash={handlePayWithCash}
+        onActivateFreePlan={handleActivateFreePlan}
         studentData={{
           id: estudiante?.uid || '',
           fullName: estudiante?.fullName || '',

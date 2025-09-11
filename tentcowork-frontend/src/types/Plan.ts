@@ -6,5 +6,5 @@ export interface Plan {
   days: string;
   startHour: string;
   endHour: string;
-  tipo?: string;
+  type: 'diario' | 'mensual'; 
 }

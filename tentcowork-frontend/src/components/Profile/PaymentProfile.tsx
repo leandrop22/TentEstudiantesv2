@@ -5,6 +5,7 @@ import {
   CheckCircle, Clock, AlertCircle, Zap, MapPin
 } from 'lucide-react';
 
+// Describe a subscription plan.  A plan can be either a daily or monthly pass.
 interface Plan {
   id: string;
   name: string;
@@ -13,6 +14,12 @@ interface Plan {
   days?: string;
   startHour?: string;
   endHour?: string;
+  /**
+   * Optional type of plan. If provided, it should be 'diario' for daily passes
+   * or 'mensual' for monthly plans.  This field isn't always present, but
+   * consumers can rely on the price or name heuristics when undefined.
+   */
+  type?: 'diario' | 'mensual';
 }
 
 interface PaymentProfileProps {
@@ -24,6 +31,13 @@ interface PaymentProfileProps {
   // Funciones que vienen del componente padre
   onPayWithMercadoPago: (plan: Plan) => void;
   onPayWithCash: (plan: Plan) => void;
+  /**
+   * Callback invoked when a free plan (price = 0) is activated.  The parent
+   * component should update the student record accordingly.  This prop is
+   * required to support gratis plans; it will be called when the user clicks
+   * the "Activar Membresía" button.
+   */
+  onActivateFreePlan: (plan: Plan) => void;
   // Datos del estudiante necesarios para el pago
   studentData: {
     id: string;
@@ -40,7 +54,8 @@ const PaymentProfile: React.FC<PaymentProfileProps> = ({
   onMessage,
   studentData,
   onPayWithMercadoPago,
-  onPayWithCash
+  onPayWithCash,
+  onActivateFreePlan
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<'mercadopago' | 'recepcion' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -87,6 +102,73 @@ const PaymentProfile: React.FC<PaymentProfileProps> = ({
 
   // Si no hay plan seleccionado, no mostrar nada
   if (!plan) return null;
+
+  // Mostrar un modal simplificado cuando el plan es gratuito.  La
+  // activación se delega al componente padre mediante onActivateFreePlan.
+  if (plan.price === 0) {
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 lg:p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl lg:rounded-3xl max-w-full sm:max-w-md w-full p-6 shadow-2xl text-center relative"
+            >
+              <button
+                onClick={onClose}
+                className="absolute top-3 right-3 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 transition-all"
+              >
+                <X size={18} />
+              </button>
+
+              <h2 className="text-xl lg:text-2xl font-bold mb-4">Plan Gratuito</h2>
+              <p className="text-gray-600 mb-6">
+                El plan <strong>{plan.name}</strong> es gratuito. No necesitás realizar ningún pago.
+              </p>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                disabled={loading || isProcessing}
+                onClick={() => {
+                  setIsProcessing(true);
+                  // Delegar activación al padre; cualquier error se manejará allí
+                  Promise.resolve(onActivateFreePlan(plan))
+                    .catch((error: any) => {
+                      console.error('Error al activar plan gratuito:', error);
+                      onMessage('❌ Error al activar plan gratuito: ' + (error?.message || ''));  
+                    })
+                    .finally(() => {
+                      setIsProcessing(false);
+                    });
+                }}
+                className="w-full py-3 lg:py-4 rounded-xl font-bold text-base lg:text-lg bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg flex items-center justify-center space-x-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Procesando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Shield size={18} />
+                    <span>Activar Membresía</span>
+                  </>
+                )}
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
 
   return (
     <AnimatePresence>

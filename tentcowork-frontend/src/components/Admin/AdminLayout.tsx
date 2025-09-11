@@ -26,7 +26,8 @@ const AdminLayout: React.FC = () => {
     days: '',
     startHour: '',
     endHour: '',
-    description: ''
+    description: '',
+    type: 'mensual',
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -184,7 +185,8 @@ const AdminLayout: React.FC = () => {
         days: '',
         startHour: '',
         endHour: '',
-        description: ''
+        description: '',
+        type: 'mensual',
       });
       
       // Recargar plans
@@ -212,8 +214,9 @@ const AdminLayout: React.FC = () => {
       days: data.days,
       startHour: data.startHour,
       endHour: data.endHour,
-      description: data.description
-    });
+      description: data.description,
+      type: data.type,  
+     });
   };
 
   const handleLogout = async () => {
