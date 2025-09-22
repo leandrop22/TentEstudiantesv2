@@ -11,7 +11,7 @@ Frontend: React
 
 Backend: Node.js con Express
 
-Base de datos: Firebase Firestore (NoSQL)
+Base de datos: Firebase Firestore 
 
 Funciones en la nube: Firebase Functions (Gen 2)
 
